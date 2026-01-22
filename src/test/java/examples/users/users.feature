@@ -1,0 +1,166 @@
+Feature: API de Usuarios - Testing Completo
+  Pruebas completas para el API de usuarios incluyendo CRUD y validaciones
+
+  Background:
+    * url baseUrl
+    * header Accept = 'application/json'
+
+  @smoke @get
+  Scenario: Obtener lista de usuarios
+    Given path '/users'
+    When method GET
+    Then status 200
+    And match response == '#array'
+    And match response[0] contains { id: '#number', name: '#string', email: '#string' }
+    And match each response contains { id: '#number', name: '#string', username: '#string', email: '#string' }
+
+  @smoke @get
+  Scenario: Obtener un usuario específico por ID
+    Given path '/users/1'
+    When method GET
+    Then status 200
+    And match response.id == 1
+    And match response.name == '#string'
+    And match response.email == '#string'
+    And match response.username == '#string'
+    And match response contains
+      """
+      {
+        id: 1,
+        name: '#string',
+        username: '#string',
+        email: '#regex .+@.+\\..+',
+        address: {
+          street: '#string',
+          city: '#string',
+          zipcode: '#string'
+        },
+        phone: '#string',
+        website: '#string',
+        company: {
+          name: '#string'
+        }
+      }
+      """
+
+  @regression @get
+  Scenario: Validar estructura de datos de usuario
+    Given path '/users/2'
+    When method GET
+    Then status 200
+    * def schema = 
+      """
+      {
+        id: '#number',
+        name: '#string',
+        username: '#string',
+        email: '#string',
+        address: {
+          street: '#string',
+          suite: '#string',
+          city: '#string',
+          zipcode: '#string',
+          geo: {
+            lat: '#string',
+            lng: '#string'
+          }
+        },
+        phone: '#string',
+        website: '#string',
+        company: {
+          name: '#string',
+          catchPhrase: '#string',
+          bs: '#string'
+        }
+      }
+      """
+    And match response == schema
+
+  @smoke @post
+  Scenario: Crear un nuevo usuario
+    Given path '/users'
+    And request
+      """
+      {
+        name: 'Test User',
+        username: 'testuser',
+        email: 'test@example.com'
+      }
+      """
+    When method POST
+    Then status 201
+    And match response.id == '#number'
+    And match response.name == 'Test User'
+    And match response.username == 'testuser'
+
+  @regression @post
+  Scenario: Crear usuario con datos dinámicos
+    * def randomEmail = generateRandomEmail()
+    * def randomName = 'Usuario ' + generateRandomString(5)
+    
+    Given path '/users'
+    And request
+      """
+      {
+        name: '#(randomName)',
+        username: 'user_' + '#(generateRandomString(8))',
+        email: '#(randomEmail)'
+      }
+      """
+    When method POST
+    Then status 201
+    And match response.name == randomName
+    And match response.email == randomEmail
+
+  @regression @put
+  Scenario: Actualizar usuario completo
+    Given path '/users/1'
+    And request
+      """
+      {
+        id: 1,
+        name: 'Updated User',
+        username: 'updateduser',
+        email: 'updated@example.com'
+      }
+      """
+    When method PUT
+    Then status 200
+    And match response.name == 'Updated User'
+    And match response.email == 'updated@example.com'
+
+  @regression @patch
+  Scenario: Actualizar parcialmente un usuario
+    Given path '/users/1'
+    And request { name: 'Partially Updated' }
+    When method PATCH
+    Then status 200
+    And match response.name == 'Partially Updated'
+
+  @regression @delete
+  Scenario: Eliminar un usuario
+    Given path '/users/1'
+    When method DELETE
+    Then status 200
+
+  @smoke @negative
+  Scenario: Usuario no encontrado - 404
+    Given path '/users/999999'
+    When method GET
+    Then status 404
+
+  @regression @datadriven
+  Scenario Outline: Obtener múltiples usuarios - Data Driven
+    Given path '/users/<userId>'
+    When method GET
+    Then status 200
+    And match response.id == <userId>
+    And match response.name == '#string'
+
+    Examples:
+      | userId |
+      | 1      |
+      | 2      |
+      | 3      |
+      | 5      |
+      | 10     |

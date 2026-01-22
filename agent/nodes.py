@@ -78,14 +78,13 @@ def map_to_xray_node(state: AgentState) -> AgentState:
     # Get parent issue key from environment (dynamically extracted from branch)
     parent_issue_key = os.getenv("JIRA_PARENT_ISSUE", "").strip()
     
+    # Crear Test Execution
+    test_execution_key = client.create_test_execution(parent_issue_key)
+    
     tests = []
     for result in state.get('karate_results', []):
-        test_key = client.get_or_create_test_issue(result.feature, result.scenario)
+        test_key = client.get_or_create_test_issue(result.feature, result.scenario, parent_issue_key)
         if test_key:
-            # Link test to parent issue if available
-            if parent_issue_key:
-                client.link_to_parent(test_key, parent_issue_key)
-            
             tests.append({
                 "testKey": test_key,
                 "status": "PASS" if result.status == "passed" else "FAIL",
@@ -94,13 +93,14 @@ def map_to_xray_node(state: AgentState) -> AgentState:
             })
     
     payload = {
-        "testExecutionKey": None,
+        "testExecutionKey": test_execution_key,
         "tests": tests
     }
     
     state["xray_import_payload"] = payload
     state["current_step"] = "mapped_to_xray"
     state["parent_issue"] = parent_issue_key or "None"
+    state["test_execution"] = test_execution_key or "None"
     return state
 
 

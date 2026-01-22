@@ -12,6 +12,7 @@ Este proyecto contiene pruebas automatizadas de APIs usando Karate, incluyendo:
 - ✅ Pruebas de integración
 - ✅ Pruebas de performance
 - ✅ Ejecución paralela
+- 🤖 **Agente LangGraph para integrar resultados con Jira Xray**
 
 ## 🏗️ Estructura del Proyecto
 
@@ -32,11 +33,27 @@ nebular-aphelion/
 │               └── auth/                # Tests de autenticación
 │                   ├── AuthTest.java
 │                   └── auth.feature
+├── agent/                               # Agente LangGraph para Jira Xray
+│   ├── requirements.txt                 # Dependencias Python
+│   ├── state.py                         # Estado del agente
+│   ├── tools.py                         # Cliente Jira Xray API
+│   ├── karate_parser.py                 # Parser de resultados Karate
+│   ├── nodes.py                         # Nodos del grafo LangGraph
+│   ├── graph.py                         # Grafo del agente
+│   └── main.py                          # Script principal
+├── .github/
+│   └── workflows/
+│       └── karate-xray.yml              # GitHub Actions workflow
 ├── pom.xml                              # Dependencias Maven
+├── JIRA_XRAY_STRUCTURE.md               # Documentación estructura Jira
 └── README.md
 ```
 
 ## 🚀 Instalación y Configuración
+
+### 🚀 Inicio Rápido (5 minutos)
+
+Para una configuración rápida del agente, ve a: **[QUICKSTART.md](QUICKSTART.md)**
 
 ### Prerequisitos
 
@@ -191,6 +208,50 @@ Ambientes disponibles:
 3. **Assertions precisas:** Usar match operators de Karate
 4. **Variables compartidas:** Usar `def` para reutilizar datos
 5. **Timeouts configurables:** Ajustar según necesidad
+
+## 🤖 Agente LangGraph - Karate a Jira Xray
+
+Este proyecto incluye un agente inteligente que procesa los resultados de Karate y los importa automáticamente a Jira Xray.
+
+### 🎯 Funcionalidades del Agente
+
+- **Analiza** resultados de Karate con LLM (OpenAI, Claude, Ollama, etc.)
+- **Mapea** tests a issues de Jira Xray automáticamente
+- **Importa** ejecuciones de prueba a Jira Xray
+- **Soporta** múltiples proveedores de LLM
+
+### 🚀 Configuración Rápida
+
+1. **Elegir proveedor LLM** (Ollama recomendado para empezar):
+   ```bash
+   cd agent
+   cp .env.example .env
+   ```
+
+2. **Editar .env:**
+   ```env
+   LLM_PROVIDER=ollama  # o openai, anthropic, azure
+   JIRA_BASE_URL=https://tu-jira.atlassian.net
+   JIRA_EMAIL=tu-email@company.com
+   JIRA_API_TOKEN=tu-token
+   XRAY_PROJECT_KEY=PROJ
+   ```
+
+3. **Instalar dependencias:**
+   ```bash
+   pip install -r agent/requirements.txt
+   ```
+
+4. **Ejecutar agente:**
+   ```bash
+   python agent/main.py target/karate-reports/karate-summary.json
+   ```
+
+### 📚 Documentación Detallada
+
+- [Documentación del Agente](agent/README-AGENT.md)
+- [Proveedores LLM Disponibles](agent/LLM_PROVIDERS.md)
+- [Estructura de Tickets en Jira Xray](JIRA_XRAY_STRUCTURE.md)
 
 ## 📚 Recursos Útiles
 

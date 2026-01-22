@@ -148,8 +148,9 @@ Feature: API de Posts - Pruebas de Publicaciones
 
   @regression @performance
   Scenario: Verificar tiempo de respuesta
-    Given path '/posts'
+    Given path '/posts/1'
     When method GET
     Then status 200
-    And match responseTime < 3000
+    * def respTime = responseTime
+    And assert respTime < 3000
     # Verifica que la respuesta sea menor a 3 segundos

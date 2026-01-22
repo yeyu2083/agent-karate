@@ -8,7 +8,7 @@ from .graph import create_agent_graph
 load_dotenv()
 
 
-def run_agent(karate_json_path: str = "target/karate-reports/karate-summary.json") -> AgentState:
+def run_agent(karate_json_path: str = "target/karate-reports/karate-summary-json.txt") -> AgentState:
     initial_state: AgentState = {
         "karate_results": [],
         "jira_ticket_id": None,

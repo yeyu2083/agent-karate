@@ -33,7 +33,13 @@ jobs:
       - name: Generate Karate JSON Report
         run: |
           mkdir -p target/karate-reports
-          echo "Karate reports generated in target/karate-reports"
+          # Renombrar el archivo txt a json para mejor compatibilidad
+          if [ -f target/karate-reports/karate-summary-json.txt ]; then
+            cp target/karate-reports/karate-summary-json.txt target/karate-reports/karate-summary.json
+            echo "Karate JSON report generated and converted"
+          else
+            echo "Warning: karate-summary-json.txt not found"
+          fi
 
       - name: Upload Karate results
         uses: actions/upload-artifact@v4

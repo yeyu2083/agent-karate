@@ -33,12 +33,19 @@ Feature: API de Usuarios - Testing Completo
         address: {
           street: '#string',
           city: '#string',
-          zipcode: '#string'
+          zipcode: '#string',
+          suite: '#string',
+          geo: {
+            lat: '#string',
+            lng: '#string'
+          }
         },
         phone: '#string',
         website: '#string',
         company: {
-          name: '#string'
+          name: '#string',
+          catchPhrase: '#string',
+          bs: '#string'
         }
       }
       """
@@ -97,13 +104,14 @@ Feature: API de Usuarios - Testing Completo
   Scenario: Crear usuario con datos dinámicos
     * def randomEmail = generateRandomEmail()
     * def randomName = 'Usuario ' + generateRandomString(5)
+    * def randomUsername = 'user_' + generateRandomString(8)
     
     Given path '/users'
     And request
       """
       {
         name: '#(randomName)',
-        username: 'user_' + '#(generateRandomString(8))',
+        username: '#(randomUsername)',
         email: '#(randomEmail)'
       }
       """

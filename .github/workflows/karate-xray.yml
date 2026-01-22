@@ -107,8 +107,7 @@ jobs:
         env:
           JIRA_PARENT_ISSUE: ${{ steps.extract_jira.outputs.issue_key }}
         run: |
-          cd agent
-          python main.py ../target/karate-reports/karate-summary.json
+          python -m agent.main target/karate-reports/karate-summary.json
 
       - name: Upload Agent Logs
         if: always()

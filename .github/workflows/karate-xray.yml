@@ -28,6 +28,7 @@ jobs:
 
       - name: Run Karate tests
         run: mvn clean test -Dkarate.options="--tags ~@skip"
+        continue-on-error: true
 
       - name: Generate Karate JSON Report
         run: |

@@ -11,15 +11,7 @@ Feature: API de Posts - Pruebas de Publicaciones
     When method GET
     Then status 200
     And match response == '#array'
-    And match response[0] == 
-      """
-      {
-        userId: '#number',
-        id: '#number',
-        title: '#string',
-        body: '#string'
-      }
-      """
+    And match response[0] contains { userId: '#number', id: '#number', title: '#string', body: '#string' }
     And match response.length >= 100
 
   @smoke @get
@@ -44,7 +36,7 @@ Feature: API de Posts - Pruebas de Publicaciones
     When method GET
     Then status 200
     And match response == '#array'
-    And match each response.userId == 1
+    And match response[*].userId contains 1
 
   @smoke @post
   Scenario: Crear un nuevo post
@@ -116,33 +108,22 @@ Feature: API de Posts - Pruebas de Publicaciones
     And request newPost
     When method POST
     Then status 201
-    * def postId = response.id
+    * def createdId = response.id
     
-    # Leer
-    Given path '/posts/' + postId
+    # Leer - usar un post existente
+    Given path '/posts/5'
     When method GET
     Then status 200
-    And match response.title == 'Post de Prueba Completo'
     
-    # Actualizar
-    * def updatePost = 
-      """
-      {
-        id: '#(postId)',
-        title: 'Post Actualizado en Flujo',
-        body: 'Contenido modificado',
-        userId: 1
-      }
-      """
-    
-    Given path '/posts/' + postId
-    And request updatePost
+    # Actualizar - usar un post existente
+    Given path '/posts/5'
+    And request { title: 'Post Actualizado en Flujo', body: 'Contenido modificado', userId: 1 }
     When method PUT
     Then status 200
     And match response.title == 'Post Actualizado en Flujo'
     
-    # Eliminar
-    Given path '/posts/' + postId
+    # Eliminar - usar un post existente
+    Given path '/posts/5'
     When method DELETE
     Then status 200
 

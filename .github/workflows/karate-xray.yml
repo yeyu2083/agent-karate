@@ -101,8 +101,7 @@ jobs:
           EOF
       - name: Run Agent to import to Xray
         run: |
-          cd agent
-          python -m agent.main ../target/karate-reports/karate-summary.json
+          python -m agent.main target/karate-reports/karate-summary.json
       - name: Upload Agent Logs
         if: always()
         uses: actions/upload-artifact@v4

@@ -25,7 +25,10 @@ class JiraXraySettings(BaseSettings):
     
     anthropic_api_key: Optional[str] = None
     anthropic_model: Optional[str] = None
-    
+
+    google_api_key: Optional[str] = None
+    google_model: str = "gemini-1.5-pro"
+
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3"
 
@@ -97,7 +100,30 @@ class JiraXrayClient:
                         "project": {"key": self.settings.xray_project_key},
                         "summary": f"{feature_name} - {scenario_name}",
                         "issuetype": {"id": issue_type_id},
-                        "description": f"Automated test from Karate feature: {feature_name}\n\nScenario: {scenario_name}",
+                        "description": {
+                            "version": 1,
+                            "type": "doc",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [
+                                        {
+                                            "type": "text",
+                                            "text": f"Automated test from Karate feature: {feature_name}"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "paragraph",
+                                    "content": [
+                                        {
+                                            "type": "text",
+                                            "text": f"Scenario: {scenario_name}"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
                         "labels": ["automated-test", "karate"]
                     }
                 }
@@ -153,7 +179,30 @@ class JiraXrayClient:
                 "project": {"key": self.settings.xray_project_key},
                 "summary": summary,
                 "issuetype": {"name": "Test Execution"},
-                "description": f"Automated test execution from Karate\nParent: {parent_key or 'N/A'}",
+                "description": {
+                    "version": 1,
+                    "type": "doc",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "Automated test execution from Karate"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": f"Parent: {parent_key or 'N/A'}"
+                                }
+                            ]
+                        }
+                    ]
+                },
                 "labels": ["automated-execution", "karate"]
             }
         }

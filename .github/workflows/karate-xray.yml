@@ -38,7 +38,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: karate-results
-          path: target/karate-reports/
+          path: |
+            target/karate-reports/
+            target/surefire-reports/
           retention-days: 7
   process-with-agent:
     runs-on: ubuntu-latest
@@ -68,7 +70,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: karate-results
-          path: target/karate-reports/
+          path: ./
       - name: Install Python dependencies
         run: |
           cd agent
@@ -99,16 +101,8 @@ jobs:
           EOF
       - name: Run Agent to import to Xray
         run: |
-          python -m agent.main target/karate-reports/karate-summary.json
-      - name: Importar resultados a Xray
-        uses: mikepenz/xray-action@v3
-        with:
-          username: ${{ secrets.XRAY_CLIENT_ID }}
-          password: ${{ secrets.XRAY_CLIENT_SECRET }}
-          testFormat: "cucumber"
-          testPaths: "target/karate-reports/karate-summary.json"
-          testExecKey: ${{ secrets.XRAY_TEST_EXEC_KEY || '' }}
-          projectKey: ${{ secrets.XRAY_PROJECT_KEY }}
+          cd agent
+          python -m agent.main ../target/karate-reports/karate-summary.json
       - name: Upload Agent Logs
         if: always()
         uses: actions/upload-artifact@v4

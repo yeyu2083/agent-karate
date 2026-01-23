@@ -63,10 +63,14 @@ def analyze_results_node(state: AgentState) -> AgentState:
     if not results_text:
         results_text = "No test results available"
     
-    chain = prompt | llm
-    response = chain.invoke({"results": results_text})
+    try:
+        chain = prompt | llm
+        response = chain.invoke({"results": results_text})
+        state["final_output"] = response.content
+    except Exception as e:
+        print(f"LLM error (using direct results): {e}")
+        state["final_output"] = f"Test Results Summary:\n{results_text}"
     
-    state["final_output"] = response.content
     state["current_step"] = "analysis_complete"
     return state
 

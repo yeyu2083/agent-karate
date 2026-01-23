@@ -22,6 +22,10 @@ class KarateParser:
                 feature_summary = data.get('featureSummary', [])
                 print(f"Feature summary has {len(feature_summary)} features")
                 
+                # Debug: Imprimir estructura de la primera feature
+                if feature_summary:
+                    print(f"First feature structure: {json.dumps(feature_summary[0], indent=2)[:500]}")
+                
                 for feature_item in feature_summary:
                     if isinstance(feature_item, dict):
                         feature_name = feature_item.get('name', 'Unknown Feature')
@@ -51,6 +55,30 @@ class KarateParser:
                 if results:
                     print(f"Successfully parsed {len(results)} test results from summary")
                     return results
+                else:
+                    print("No scenarios found in featureSummary, searching for scenarios in root data...")
+                    # Buscar scenarios en otro nivel
+                    if 'scenarios' in data:
+                        scenarios = data.get('scenarios', [])
+                        print(f"Found {len(scenarios)} scenarios in root data")
+                        for scenario in scenarios:
+                            if isinstance(scenario, dict):
+                                scenario_name = scenario.get('name', 'Unknown Scenario')
+                                scenario_status = scenario.get('status', 'unknown')
+                                duration = scenario.get('duration', 0) / 1000
+                                error_msg = scenario.get('error', None)
+                                
+                                status = 'passed' if scenario_status == 'passed' else 'failed'
+                                
+                                results.append(TestResult(
+                                    feature='Unknown Feature',
+                                    scenario=scenario_name,
+                                    status=status,
+                                    duration=duration,
+                                    error_message=error_msg
+                                ))
+                        if results:
+                            return results
             
             # Si no es un resumen, intentar parsing normal
             features = []

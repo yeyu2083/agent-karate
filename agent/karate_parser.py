@@ -17,33 +17,39 @@ class KarateParser:
                 return results
             
             # Si es un resumen (tiene keys como 'efficiency', 'totalTime', etc.)
-            # Buscar archivos individuales
             if isinstance(data, dict) and 'featureSummary' in data:
-                print("Detected Karate summary format, looking for feature files...")
-                report_dir = os.path.dirname(file_path)
-                print(f"Looking in directory: {report_dir}")
+                print("Detected Karate summary format")
+                feature_summary = data.get('featureSummary', [])
+                print(f"Feature summary has {len(feature_summary)} features")
                 
-                # Listar todos los archivos en el directorio
-                try:
-                    all_files = os.listdir(report_dir)
-                    print(f"Files in directory: {all_files}")
-                except Exception as e:
-                    print(f"Error listing directory: {e}")
-                
-                # Buscar archivos .karate-json.txt
-                for filename in os.listdir(report_dir):
-                    if filename.endswith('.karate-json.txt') and not filename.startswith('karate-summary'):
-                        print(f"Found feature file: {filename}")
-                        feature_file = os.path.join(report_dir, filename)
-                        try:
-                            with open(feature_file, 'r', encoding='utf-8') as f:
-                                feature_data = json.load(f)
-                            results.extend(KarateParser._parse_feature_data(feature_data, filename))
-                        except Exception as e:
-                            print(f"Error parsing {feature_file}: {e}")
+                for feature_item in feature_summary:
+                    if isinstance(feature_item, dict):
+                        feature_name = feature_item.get('name', 'Unknown Feature')
+                        scenarios = feature_item.get('scenarios', [])
+                        
+                        print(f"Processing feature: {feature_name} with {len(scenarios)} scenarios")
+                        
+                        for scenario in scenarios:
+                            if isinstance(scenario, dict):
+                                scenario_name = scenario.get('name', 'Unknown Scenario')
+                                scenario_status = scenario.get('status', 'unknown')
+                                duration = scenario.get('duration', 0) / 1000  # convertir a segundos
+                                error_msg = scenario.get('error', None)
+                                
+                                status = 'passed' if scenario_status == 'passed' else 'failed'
+                                
+                                print(f"  - Scenario: {scenario_name} -> {status}")
+                                
+                                results.append(TestResult(
+                                    feature=feature_name,
+                                    scenario=scenario_name,
+                                    status=status,
+                                    duration=duration,
+                                    error_message=error_msg
+                                ))
                 
                 if results:
-                    print(f"Successfully parsed {len(results)} test results from feature files")
+                    print(f"Successfully parsed {len(results)} test results from summary")
                     return results
             
             # Si no es un resumen, intentar parsing normal

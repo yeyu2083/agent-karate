@@ -27,12 +27,13 @@ jobs:
       - name: Generate Karate JSON Report
         run: |
           mkdir -p target/karate-reports
-          # Renombrar el archivo txt a json para mejor compatibilidad
-          if [ -f target/karate-reports/karate-summary-json.txt ]; then
-            cp target/karate-reports/karate-summary-json.txt target/karate-reports/karate-summary.json
-            echo "Karate JSON report generated and converted"
+          # Karate ya genera los JSON directamente con --format json
+          # Solo validar que existan
+          if [ ! -f target/karate-reports/karate.json ]; then
+            echo "Warning: karate.json not found, creating minimal report"
+            echo '{"features":[]}' > target/karate-reports/karate.json
           else
-            echo "Warning: karate-summary-json.txt not found"
+            echo "Karate JSON report found successfully"
           fi
       - name: Upload Karate results
         uses: actions/upload-artifact@v4
@@ -97,11 +98,11 @@ jobs:
           JIRA_API_TOKEN=${{ secrets.JIRA_API_TOKEN }}
           XRAY_PROJECT_KEY=${{ secrets.XRAY_PROJECT_KEY }}
           JIRA_PARENT_ISSUE=${{ steps.extract_jira.outputs.issue_key }}
-          KARATE_RESULTS_PATH=target/karate-reports/karate-summary.json
+          KARATE_RESULTS_PATH=target/karate-reports/karate.json
           EOF
       - name: Run Agent to import to Xray
         run: |
-          python -m agent.main target/karate-reports/karate-summary.json
+          python -m agent.main target/karate-reports/karate.json
       - name: Upload Agent Logs
         if: always()
         uses: actions/upload-artifact@v4

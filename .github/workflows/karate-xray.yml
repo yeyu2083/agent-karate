@@ -103,7 +103,20 @@ jobs:
           EOF
       - name: Run Agent to import to Xray
         run: |
-          python -m agent.main target/karate-reports/karate.json
+          echo "🔍 Searching for karate.json..."
+          find . -name "karate.json"
+          
+          # Encontrar el archivo donde sea que esté
+          JSON_PATH=$(find . -name "karate.json" | head -n 1)
+          
+          if [ -n "$JSON_PATH" ]; then
+            echo "✅ Found report at: $JSON_PATH"
+            python -m agent.main "$JSON_PATH"
+          else
+            echo "❌ Report not found. Listing all files for debug:"
+            ls -R
+            exit 1
+          fi
       - name: Upload Agent Logs
         if: always()
         uses: actions/upload-artifact@v4

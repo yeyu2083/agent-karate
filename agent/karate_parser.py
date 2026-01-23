@@ -21,10 +21,19 @@ class KarateParser:
             if isinstance(data, dict) and 'featureSummary' in data:
                 print("Detected Karate summary format, looking for feature files...")
                 report_dir = os.path.dirname(file_path)
+                print(f"Looking in directory: {report_dir}")
+                
+                # Listar todos los archivos en el directorio
+                try:
+                    all_files = os.listdir(report_dir)
+                    print(f"Files in directory: {all_files}")
+                except Exception as e:
+                    print(f"Error listing directory: {e}")
                 
                 # Buscar archivos .karate-json.txt
                 for filename in os.listdir(report_dir):
                     if filename.endswith('.karate-json.txt') and not filename.startswith('karate-summary'):
+                        print(f"Found feature file: {filename}")
                         feature_file = os.path.join(report_dir, filename)
                         try:
                             with open(feature_file, 'r', encoding='utf-8') as f:

@@ -112,7 +112,9 @@ class JiraXrayClient:
                     
                     return created_key
                 else:
-                    print(f"  Tipo '{issue_type_name}' no disponible ({response.status_code}), intentando siguiente...")
+                    error_detail = response.json() if response.headers.get('content-type') == 'application/json' else response.text
+                    print(f"  Tipo '{issue_type_name}' falló ({response.status_code}): {error_detail}")
+                    print(f"  Payload enviado: {json.dumps(payload, indent=2)}")
             
             print(f"✗ No se pudo crear issue para: {feature_name} - {scenario_name}")
         return test_key

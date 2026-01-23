@@ -1,16 +1,13 @@
 name: Karate Tests and Xray Import
-
 on:
   push:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
-
 env:
   JAVA_VERSION: '17'
   MAVEN_OPTS: -Xmx3072m
-
 jobs:
   run-karate-tests:
     runs-on: ubuntu-latest
@@ -18,18 +15,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
           cache: 'maven'
-
       - name: Run Karate tests
         run: mvn clean test -Dkarate.options="--tags ~@skip"
         continue-on-error: true
-
       - name: Generate Karate JSON Report
         run: |
           mkdir -p target/karate-reports
@@ -40,14 +34,12 @@ jobs:
           else
             echo "Warning: karate-summary-json.txt not found"
           fi
-
       - name: Upload Karate results
         uses: actions/upload-artifact@v4
         with:
           name: karate-results
           path: target/karate-reports/
           retention-days: 7
-
   process-with-agent:
     runs-on: ubuntu-latest
     needs: run-karate-tests
@@ -55,7 +47,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Extract Jira Issue Key from Branch
         id: extract_jira
         run: |
@@ -68,24 +59,20 @@ jobs:
           else
             echo "Jira issue key detected: $ISSUE_KEY"
           fi
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
-
       - name: Download Karate results
         uses: actions/download-artifact@v4
         with:
           name: karate-results
           path: target/karate-reports/
-
       - name: Install Python dependencies
         run: |
           cd agent
           pip install -r requirements.txt
-
       - name: Create .env file
         run: |
           cd agent
@@ -108,13 +95,18 @@ jobs:
           JIRA_PARENT_ISSUE=${{ steps.extract_jira.outputs.issue_key }}
           KARATE_RESULTS_PATH=target/karate-reports/karate-summary.json
           EOF
-
       - name: Run Agent to import to Xray
-        env:
-          JIRA_PARENT_ISSUE: ${{ steps.extract_jira.outputs.issue_key }}
         run: |
           python -m agent.main target/karate-reports/karate-summary.json
-
+      - name: Importar resultados a Xray
+        uses: mikepenz/xray-action@v3
+        with:
+          username: ${{ secrets.XRAY_CLIENT_ID }}
+          password: ${{ secrets.XRAY_CLIENT_SECRET }}
+          testFormat: "cucumber"
+          testPaths: "target/karate-reports/karate-summary.json"
+          testExecKey: ${{ secrets.XRAY_TEST_EXEC_KEY || '' }}
+          projectKey: ${{ secrets.XRAY_PROJECT_KEY }}
       - name: Upload Agent Logs
         if: always()
         uses: actions/upload-artifact@v4

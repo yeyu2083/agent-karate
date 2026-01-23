@@ -62,20 +62,41 @@ class JiraXrayClient:
         response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
         return response.json() if response.status_code == 200 else {"error": response.text}
 
+    def get_issue_type_id(self, type_name: str) -> Optional[str]:
+        """Get the ID of an issue type by name from the project"""
+        url = f"{self.settings.jira_base_url}/rest/api/3/issuetype"
+        response = requests.get(url, headers=self.headers, auth=self.auth)
+        
+        if response.status_code == 200:
+            issue_types = response.json()
+            for issue_type in issue_types:
+                if issue_type.get("name") == type_name:
+                    print(f"Found issue type '{type_name}' with ID: {issue_type.get('id')}")
+                    return issue_type.get("id")
+        
+        print(f"Could not find issue type '{type_name}'")
+        return None
+
     def get_or_create_test_issue(self, feature_name: str, scenario_name: str, parent_key: Optional[str] = None) -> Optional[str]:
         test_key = self.search_test_issue(f"{feature_name} - {scenario_name}")
         if not test_key:
             url = f"{self.settings.jira_base_url}/rest/api/3/issue"
             
-            # Intentar crear como "Test" (tipo Xray)
-            issue_types_to_try = ["Test", "Task", "Story"]
+            # Intentar en orden: Test -> Task -> Story
+            issue_type_names = ["Test", "Task", "Story"]
             
-            for issue_type in issue_types_to_try:
+            for issue_type_name in issue_type_names:
+                # Obtener el ID dinámicamente
+                issue_type_id = self.get_issue_type_id(issue_type_name)
+                if not issue_type_id:
+                    print(f"  Skipping '{issue_type_name}' (not found in project)")
+                    continue
+                
                 payload = {
                     "fields": {
                         "project": {"key": self.settings.xray_project_key},
                         "summary": f"{feature_name} - {scenario_name}",
-                        "issuetype": {"name": issue_type},
+                        "issuetype": {"id": issue_type_id},
                         "description": f"Automated test from Karate feature: {feature_name}\n\nScenario: {scenario_name}",
                         "labels": ["automated-test", "karate"]
                     }
@@ -83,7 +104,7 @@ class JiraXrayClient:
                 response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
                 if response.status_code == 201:
                     created_key = response.json()["key"]
-                    print(f"✓ Created {issue_type} issue: {created_key}")
+                    print(f"✓ Created {issue_type_name} issue: {created_key}")
                     
                     # Vincular al parent si existe
                     if parent_key:
@@ -91,7 +112,7 @@ class JiraXrayClient:
                     
                     return created_key
                 else:
-                    print(f"  Tipo '{issue_type}' no disponible ({response.status_code}), intentando siguiente...")
+                    print(f"  Tipo '{issue_type_name}' no disponible ({response.status_code}), intentando siguiente...")
             
             print(f"✗ No se pudo crear issue para: {feature_name} - {scenario_name}")
         return test_key

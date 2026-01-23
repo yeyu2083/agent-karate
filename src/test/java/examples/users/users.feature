@@ -69,6 +69,6 @@ Feature: API de Usuarios - Testing Completo
 
   @smoke @negative
   Scenario: Usuario no encontrado - 404
-    Given path '/users', 999999
+    Given path '/users/999999'
     When method GET
     Then status 404

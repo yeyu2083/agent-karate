@@ -13,7 +13,7 @@ class JiraXraySettings(BaseSettings):
     jira_email: str
     jira_api_token: str
     xray_project_key: str
-    llm_provider: str = "openai"
+    llm_provider: str = "glm"
     
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o"
@@ -47,6 +47,27 @@ class JiraXrayClient:
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
+
+    def check_connection(self) -> bool:
+        """Verify connection to Jira"""
+        url = f"{self.settings.jira_base_url}/rest/api/3/myself"
+        try:
+            response = requests.get(url, headers=self.headers, auth=self.auth)
+            if response.status_code == 200:
+                user_data = response.json()
+                print(f"✅ Successfully connected to Jira as {user_data.get('displayName')} ({user_data.get('emailAddress')})")
+                return True
+            else:
+                print(f"❌ Failed to connect to Jira. Status: {response.status_code}")
+                # Print shorter error message
+                try: 
+                    print(f"Response: {response.json()}")
+                except:
+                    print(f"Response: {response.text[:200]}")
+                return False
+        except Exception as e:
+            print(f"❌ Error connecting to Jira: {e}")
+            return False
 
     def search_test_issue(self, test_name: str) -> Optional[str]:
         url = f"{self.settings.jira_base_url}/rest/api/3/search"

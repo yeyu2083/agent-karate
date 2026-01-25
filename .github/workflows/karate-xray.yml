@@ -81,7 +81,7 @@ jobs:
         run: |
           cd agent
           cat > .env << EOF
-          LLM_PROVIDER=google
+          LLM_PROVIDER=openai
           GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
           GOOGLE_MODEL=${{ secrets.GOOGLE_MODEL || 'gemini-2.0-flash' }}
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}

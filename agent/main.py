@@ -9,6 +9,18 @@ from .tools import JiraXraySettings, JiraXrayClient
 load_dotenv()
 
 
+# agent.py
+import os
+import sys
+from dotenv import load_dotenv
+from .state import AgentState, TestResult
+from .karate_parser import KarateParser
+from .graph import create_agent_graph
+from .tools import JiraXraySettings, JiraXrayClient
+
+load_dotenv()
+
+
 def run_agent(karate_json_path: str = "target/karate-reports/karate-summary.json") -> AgentState:
     initial_state: AgentState = {
         "karate_results": [],
@@ -34,6 +46,7 @@ def run_agent(karate_json_path: str = "target/karate-reports/karate-summary.json
     
     if not os.path.exists(karate_json_path):
         print(f"Error: Karate results file not found at {karate_json_path}")
+        initial_state["current_step"] = "file_not_found"
         return initial_state
     
     parser = KarateParser()
@@ -41,6 +54,7 @@ def run_agent(karate_json_path: str = "target/karate-reports/karate-summary.json
     
     if not results:
         print("No test results found in Karate JSON file")
+        initial_state["current_step"] = "no_results"
         return initial_state
     
     print(f"Loaded {len(results)} test results from Karate")

@@ -1,3 +1,4 @@
+# tools.py
 import requests
 import json
 from typing import List, Dict, Any, Optional
@@ -99,7 +100,7 @@ class JiraXrayClient:
             for issue_type in issue_types:
                 if issue_type.get("name") == type_name:
                     print(f"Found issue type '{type_name}' with ID: {issue_type.get('id')}")
-                    return issue_type.get("id")
+                    return issue_type.get('id')
         
         print(f"Could not find issue type '{type_name}'")
         return None
@@ -168,6 +169,7 @@ class JiraXrayClient:
             
             print(f"✗ No se pudo crear issue para: {feature_name} - {scenario_name}")
         return test_key
+        
     def link_to_parent(self, test_key: str, parent_key: str) -> bool:
         """Link a test issue to a parent issue (Epic, Story, Task, etc.)"""
         try:

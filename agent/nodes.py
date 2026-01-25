@@ -1,3 +1,4 @@
+# nodes.py
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -66,28 +67,64 @@ def get_llm(settings: JiraXraySettings):
 
 def analyze_results_node(state: AgentState) -> AgentState:
     settings = JiraXraySettings()
-    llm = get_llm(settings)
-    
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a QA analyst. Analyze these test results and provide a summary."),
-        ("human", "{results}")
-    ])
-    
-    results_text = "\n".join([
-        f"- Feature: {r.feature}, Scenario: {r.scenario}, Status: {r.status}, Duration: {r.duration:.2f}s"
-        for r in state.get('karate_results', [])
-    ])
-    
-    if not results_text:
-        results_text = "No test results available"
     
     try:
+        llm = get_llm(settings)
+        
+        # Preparar los resultados de las pruebas para el LLM
+        total_tests = len(state.get('karate_results', []))
+        passed_tests = sum(1 for result in state.get('karate_results', []) if result.status == "passed")
+        failed_tests = total_tests - passed_tests
+        
+        # Crear un resumen de los resultados
+        results_summary = f"""
+        Total de pruebas: {total_tests}
+        Pruebas exitosas: {passed_tests}
+        Pruebas fallidas: {failed_tests}
+        
+        Detalles de las pruebas fallidas:
+        """
+        
+        # Agregar detalles de las pruebas fallidas
+        for result in state.get('karate_results', []):
+            if result.status == "failed":
+                results_summary += f"""
+                - Feature: {result.feature}
+                - Scenario: {result.scenario}
+                - Error: {result.error_message or 'No error message provided'}
+                """
+        
+        # Prompt mejorado para el LLM
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """Eres un analista de QA especializado en pruebas de automatización con Karate.
+            Analiza los siguientes resultados de pruebas y proporciona un resumen detallado que incluya:
+            1. Un resumen ejecutivo de los resultados
+            2. Las principales causas de los fallos (si hay alguna)
+            3. Recomendaciones para mejorar los resultados
+            4. Una evaluación de la calidad general del código de pruebas
+            
+            Usa un tono profesional y estructurado suitable para un informe técnico."""),
+            ("human", "{results}")
+        ])
+        
         chain = prompt | llm
-        response = chain.invoke({"results": results_text})
+        response = chain.invoke({"results": results_summary})
         state["final_output"] = response.content
     except Exception as e:
         print(f"LLM error (using direct results): {e}")
-        state["final_output"] = f"Test Results Summary:\n{results_text}"
+        # Fallback a un resumen simple si el LLM falla
+        total_tests = len(state.get('karate_results', []))
+        passed_tests = sum(1 for result in state.get('karate_results', []) if result.status == "passed")
+        failed_tests = total_tests - passed_tests
+        
+        state["final_output"] = f"""
+        Test Results Summary:
+        - Total tests: {total_tests}
+        - Passed: {passed_tests}
+        - Failed: {failed_tests}
+        
+        Note: Detailed analysis unavailable due to LLM error: {str(e)}
+        """
     
     state["current_step"] = "analysis_complete"
     return state
@@ -100,29 +137,35 @@ def map_to_xray_node(state: AgentState) -> AgentState:
     # Get parent issue key from environment (dynamically extracted from branch)
     parent_issue_key = os.getenv("JIRA_PARENT_ISSUE", "").strip()
     
-    # Crear Test Execution
-    test_execution_key = client.create_test_execution(parent_issue_key)
+    try:
+        # Crear Test Execution
+        test_execution_key = client.create_test_execution(parent_issue_key)
+        
+        tests = []
+        for result in state.get('karate_results', []):
+            test_key = client.get_or_create_test_issue(result.feature, result.scenario, parent_issue_key)
+            if test_key:
+                tests.append({
+                    "testKey": test_key,
+                    "status": "PASS" if result.status == "passed" else "FAIL",
+                    "comment": result.error_message or "Test executed successfully",
+                    "start": str(int(result.duration * 1000))
+                })
+        
+        payload = {
+            "testExecutionKey": test_execution_key,
+            "tests": tests
+        }
+        
+        state["xray_import_payload"] = payload
+        state["current_step"] = "mapped_to_xray"
+        state["parent_issue"] = parent_issue_key or "None"
+        state["test_execution"] = test_execution_key or "None"
+    except Exception as e:
+        print(f"Error mapping to Xray: {e}")
+        state["current_step"] = "xray_mapping_error"
+        state["error_message"] = str(e)
     
-    tests = []
-    for result in state.get('karate_results', []):
-        test_key = client.get_or_create_test_issue(result.feature, result.scenario, parent_issue_key)
-        if test_key:
-            tests.append({
-                "testKey": test_key,
-                "status": "PASS" if result.status == "passed" else "FAIL",
-                "comment": result.error_message or "Test executed successfully",
-                "start": str(int(result.duration * 1000))
-            })
-    
-    payload = {
-        "testExecutionKey": test_execution_key,
-        "tests": tests
-    }
-    
-    state["xray_import_payload"] = payload
-    state["current_step"] = "mapped_to_xray"
-    state["parent_issue"] = parent_issue_key or "None"
-    state["test_execution"] = test_execution_key or "None"
     return state
 
 
@@ -132,8 +175,16 @@ def upload_to_jira_node(state: AgentState) -> AgentState:
     
     payload = state.get("xray_import_payload")
     if payload:
-        response = client.import_execution_to_xray(payload)
-        state["jira_response"] = response
-        state["current_step"] = "uploaded_to_jira"
+        try:
+            response = client.import_execution_to_xray(payload)
+            state["jira_response"] = response
+            state["current_step"] = "uploaded_to_jira"
+        except Exception as e:
+            print(f"Error uploading to Jira: {e}")
+            state["current_step"] = "jira_upload_error"
+            state["error_message"] = str(e)
+    else:
+        print("No payload to upload to Jira")
+        state["current_step"] = "no_payload"
     
     return state

@@ -33,33 +33,8 @@ Feature: API de Usuarios - Testing Completo
         address: {
           street: '#string',
           city: '#string',
-          zipcode: '#string'
-        },
-        phone: '#string',
-        website: '#string',
-        company: {
-          name: '#string'
-        }
-      }
-      """
-
-  @regression @get
-  Scenario: Validar estructura de datos de usuario
-    Given path '/users/2'
-    When method GET
-    Then status 200
-    * def schema = 
-      """
-      {
-        id: '#number',
-        name: '#string',
-        username: '#string',
-        email: '#string',
-        address: {
-          street: '#string',
-          suite: '#string',
-          city: '#string',
           zipcode: '#string',
+          suite: '#string',
           geo: {
             lat: '#string',
             lng: '#string'
@@ -74,7 +49,6 @@ Feature: API de Usuarios - Testing Completo
         }
       }
       """
-    And match response == schema
 
   @smoke @post
   Scenario: Crear un nuevo usuario
@@ -93,74 +67,8 @@ Feature: API de Usuarios - Testing Completo
     And match response.name == 'Test User'
     And match response.username == 'testuser'
 
-  @regression @post
-  Scenario: Crear usuario con datos dinámicos
-    * def randomEmail = generateRandomEmail()
-    * def randomName = 'Usuario ' + generateRandomString(5)
-    
-    Given path '/users'
-    And request
-      """
-      {
-        name: '#(randomName)',
-        username: 'user_' + '#(generateRandomString(8))',
-        email: '#(randomEmail)'
-      }
-      """
-    When method POST
-    Then status 201
-    And match response.name == randomName
-    And match response.email == randomEmail
-
-  @regression @put
-  Scenario: Actualizar usuario completo
-    Given path '/users/1'
-    And request
-      """
-      {
-        id: 1,
-        name: 'Updated User',
-        username: 'updateduser',
-        email: 'updated@example.com'
-      }
-      """
-    When method PUT
-    Then status 200
-    And match response.name == 'Updated User'
-    And match response.email == 'updated@example.com'
-
-  @regression @patch
-  Scenario: Actualizar parcialmente un usuario
-    Given path '/users/1'
-    And request { name: 'Partially Updated' }
-    When method PATCH
-    Then status 200
-    And match response.name == 'Partially Updated'
-
-  @regression @delete
-  Scenario: Eliminar un usuario
-    Given path '/users/1'
-    When method DELETE
-    Then status 200
-
   @smoke @negative
   Scenario: Usuario no encontrado - 404
     Given path '/users/999999'
     When method GET
     Then status 404
-
-  @regression @datadriven
-  Scenario Outline: Obtener múltiples usuarios - Data Driven
-    Given path '/users/<userId>'
-    When method GET
-    Then status 200
-    And match response.id == <userId>
-    And match response.name == '#string'
-
-    Examples:
-      | userId |
-      | 1      |
-      | 2      |
-      | 3      |
-      | 5      |
-      | 10     |

@@ -29,6 +29,9 @@ class JiraXraySettings(BaseSettings):
     google_api_key: Optional[str] = None
     google_model: str = "gemini-1.5-pro"
 
+    zai_api_key: Optional[str] = None
+    zai_model: str = "GLM-4.7-flash"
+
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3"
 

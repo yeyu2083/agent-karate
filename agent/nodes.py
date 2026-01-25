@@ -1,6 +1,7 @@
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_community.chat_models import ChatZhipuAI
 from langchain_community.llms import Ollama
 from langchain_core.prompts import ChatPromptTemplate
 from .state import AgentState
@@ -43,6 +44,14 @@ def get_llm(settings: JiraXraySettings):
         return ChatGoogleGenerativeAI(
             api_key=settings.google_api_key,
             model=settings.google_model
+        )
+
+    elif provider in ["zhipu", "glm", "zai"]:
+        if not settings.zai_api_key:
+            raise ValueError("ZAI_API_KEY not set")
+        return ChatZhipuAI(
+            api_key=settings.zai_api_key,
+            model=settings.zai_model
         )
 
     elif provider == "ollama":

@@ -1,5 +1,5 @@
 # graph.py
-from langchain.graph import StateGraph, END
+from langgraph.graph import StateGraph, END
 from .state import AgentState
 from .nodes import analyze_results_node, map_to_xray_node, upload_to_jira_node
 

@@ -91,18 +91,30 @@ class JiraXrayClient:
         return response.json() if response.status_code == 200 else {"error": response.text}
 
     def get_issue_type_id(self, type_name: str) -> Optional[str]:
-        """Get the ID of an issue type by name from the project"""
-        url = f"{self.settings.jira_base_url}/rest/api/3/issuetype"
+        """Get the ID of an issue type by name from the project configuration"""
+        url = f"{self.settings.jira_base_url}/rest/api/3/project/{self.settings.xray_project_key}"
         response = requests.get(url, headers=self.headers, auth=self.auth)
         
         if response.status_code == 200:
-            issue_types = response.json()
+            project_data = response.json()
+            issue_types = project_data.get("issueTypes", [])
             for issue_type in issue_types:
                 if issue_type.get("name") == type_name:
-                    print(f"Found issue type '{type_name}' with ID: {issue_type.get('id')}")
+                    print(f"Found project issue type '{type_name}' with ID: {issue_type.get('id')}")
                     return issue_type.get('id')
         
-        print(f"Could not find issue type '{type_name}'")
+        print(f"Could not find issue type '{type_name}' in project {self.settings.xray_project_key}")
+        # Intento de fallback a búsqueda global si falla la del proyecto
+        return self._get_global_issue_type_id(type_name)
+
+    def _get_global_issue_type_id(self, type_name: str) -> Optional[str]:
+        """Fallback: Get global issue type ID"""
+        url = f"{self.settings.jira_base_url}/rest/api/3/issuetype"
+        response = requests.get(url, headers=self.headers, auth=self.auth)
+        if response.status_code == 200:
+            for issue_type in response.json():
+                if issue_type.get("name") == type_name:
+                    return issue_type.get('id')
         return None
 
     def get_or_create_test_issue(self, feature_name: str, scenario_name: str, parent_key: Optional[str] = None) -> Optional[str]:

@@ -86,9 +86,36 @@ class JiraXrayClient:
         return None
 
     def import_execution_to_xray(self, payload: dict) -> Dict[str, Any]:
-        url = f"{self.settings.jira_base_url}/rest/raven/2.0/import/execution"
-        response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
-        return response.json() if response.status_code == 200 else {"error": response.text}
+        """Import execution results to Xray"""
+        # Determine if we are on Cloud or Server/DC
+        is_cloud = "atlassian.net" in self.settings.jira_base_url
+        
+        if is_cloud:
+            # Xray Cloud uses a separate API endpoint and authentication mechanism (Client ID/Secret)
+            # which is different from Jira Basic Auth.
+            # Using the internal raven proxy usually doesn't work with API tokens.
+            # However, for simplicity, we will try the /import/execution endpoint that sometimes works 
+            # if the plugin is configured to accept it, OR we skip it if we don't have separate credentials.
+            
+            # If we don't have Xray Cloud client credentials, we unfortunately can't use the Xray API directly.
+            # But since we already created the Test Execution manually in 'map_to_xray_node', 
+            # and we are not using the Xray 'import' feature to CREATE the execution but to UPDATE it?
+            # Actually, the payload constructed in 'map_to_xray_node' is for the Xray Import API.
+            
+            # If we are manually creating issues, we might just want to update the status of the run.
+            # Since integrating full Xray Cloud Auth is complex without ClientID/Secret, 
+            # and likely the user only has Jira credentials, we will default to skipping this step strictly 
+            # and relying on the 'Test Execution' issue created in 'map_to_xray_node'.
+            
+            print("⚠️ Xray Cloud detected. Skipping direct Xray Import API call as it requires separate credentials.")
+            print("ℹ️ The Test Execution issue has been created in Jira manually.")
+            return {"status": "skipped", "reason": "Xray Cloud requires Client ID/Secret"}
+            
+        else:
+            # Jira Server / Data Center
+            url = f"{self.settings.jira_base_url}/rest/raven/2.0/import/execution"
+            response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
+            return response.json() if response.status_code == 200 else {"error": response.text}
 
     def get_issue_type_id(self, type_name: str) -> Optional[str]:
         """Get the ID of an issue type by name from the project configuration"""
@@ -98,13 +125,18 @@ class JiraXrayClient:
         if response.status_code == 200:
             project_data = response.json()
             issue_types = project_data.get("issueTypes", [])
+            
+            # Print available issue types for debugging
+            available_types = [t.get("name") for t in issue_types]
+            print(f"ℹ️ Available issue types in project {self.settings.xray_project_key}: {available_types}")
+            
             for issue_type in issue_types:
-                if issue_type.get("name") == type_name:
-                    print(f"Found project issue type '{type_name}' with ID: {issue_type.get('id')}")
+                # Case-insensitive comparison
+                if issue_type.get("name").lower() == type_name.lower():
+                    print(f"Found project issue type '{issue_type.get('name')}' with ID: {issue_type.get('id')}")
                     return issue_type.get('id')
         
         print(f"Could not find issue type '{type_name}' in project {self.settings.xray_project_key}")
-        # Intento de fallback a búsqueda global si falla la del proyecto
         return self._get_global_issue_type_id(type_name)
 
     def _get_global_issue_type_id(self, type_name: str) -> Optional[str]:
@@ -122,8 +154,8 @@ class JiraXrayClient:
         if not test_key:
             url = f"{self.settings.jira_base_url}/rest/api/3/issue"
             
-            # Intentar en orden: Test -> Task -> Story
-            issue_type_names = ["Test", "Task", "Story"]
+            # Intentar en orden incluyendo nombres en español
+            issue_type_names = ["Test", "Prueba", "Task", "Tarea", "Story", "Historia"]
             
             for issue_type_name in issue_type_names:
                 # Obtener el ID dinámicamente
@@ -212,11 +244,25 @@ class JiraXrayClient:
         if parent_key:
             summary = f"Test Execution for {parent_key} - {timestamp}"
         
+        # Intentar encontrar issue type 'Test Execution' o 'Ejecución de Prueba' o 'Task'
+        execution_types = ["Test Execution", "Ejecución de Prueba", "Task", "Tarea"]
+        issue_type_id = None
+        
+        for et in execution_types:
+            issue_type_id = self.get_issue_type_id(et)
+            if issue_type_id:
+                print(f"Using issue type for execution: {et} ({issue_type_id})")
+                break
+        
+        if not issue_type_id:
+            print("⚠️ Could not find suitable issue type for Test Execution.")
+            return None
+        
         payload = {
             "fields": {
                 "project": {"key": self.settings.xray_project_key},
                 "summary": summary,
-                "issuetype": {"name": "Test Execution"},
+                "issuetype": {"id": issue_type_id},
                 "description": {
                     "version": 1,
                     "type": "doc",

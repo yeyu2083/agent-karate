@@ -8,6 +8,7 @@ class TestResult(BaseModel):
     status: str
     duration: float
     error_message: Optional[str] = None
+    steps: List[dict] = Field(default_factory=list)
 
 
 class AgentState(TypedDict):

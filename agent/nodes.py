@@ -143,7 +143,18 @@ def map_to_xray_node(state: AgentState) -> AgentState:
         
         tests = []
         for result in state.get('karate_results', []):
-            test_key = client.get_or_create_test_issue(result.feature, result.scenario, parent_issue_key)
+            test_key = client.get_or_create_test_issue(
+                result.feature, 
+                result.scenario, 
+                parent_issue_key,
+                steps=result.steps # Pasamos los pasos detallados
+            )
+            
+            # Agregamos los tests a la ejecución creada (Vinculando Issues)
+            if test_execution_key and test_key:
+                 client.link_issues(test_execution_key, test_key, link_name="contains") # O un enlace genérico
+                 client.add_comment(test_execution_key, f"Test {test_key} result: {result.status.upper()}")
+
             if test_key:
                 tests.append({
                     "testKey": test_key,
@@ -161,6 +172,15 @@ def map_to_xray_node(state: AgentState) -> AgentState:
         state["current_step"] = "mapped_to_xray"
         state["parent_issue"] = parent_issue_key or "None"
         state["test_execution"] = test_execution_key or "None"
+        
+        # TRANSICIONAR HISTORIA DE USUARIO (US) SI TODOS LOS TESTS PASAN
+        if parent_issue_key and all(r.status == "passed" for r in state.get('karate_results', [])):
+            print(f"🌟 All tests passed! Attempting to move US {parent_issue_key} to 'Done'...")
+            # Intenta estados comunes de terminación
+            if not client.transition_issue(parent_issue_key, "Done"):
+                 if not client.transition_issue(parent_issue_key, "Finalizado"):
+                      client.transition_issue(parent_issue_key, "Tested")
+
     except Exception as e:
         print(f"Error mapping to Xray: {e}")
         state["current_step"] = "xray_mapping_error"

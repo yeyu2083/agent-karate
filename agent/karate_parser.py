@@ -122,13 +122,26 @@ class KarateParser:
             
             status = 'passed' if scenario_status == 'passed' else 'failed'
             
-            steps = scenario.get('steps', [])
+            steps_data = [] # Data completa de pasos para Jira
             if isinstance(steps, list):
                 duration = sum(
                     step.get('result', {}).get('duration', 0) 
                     for step in steps 
                     if isinstance(step, dict) and 'result' in step
                 ) / 1e9
+                
+                # Extraer info detallada de pasos
+                for step in steps:
+                    if isinstance(step, dict):
+                        result = step.get('result', {})
+                        step_info = {
+                            "keyword": step.get('keyword', ''),
+                            "text": step.get('name', ''),
+                            "status": result.get('status', 'unknown'),
+                            "duration_ms": result.get('duration', 0) / 1e6, # nanoseconds to milliseconds
+                            "error": result.get('error_message', None)
+                        }
+                        steps_data.append(step_info)
             else:
                 duration = 0.0
             
@@ -147,7 +160,8 @@ class KarateParser:
                 scenario=scenario_name,
                 status=status,
                 duration=duration,
-                error_message=error_message
+                error_message=error_message,
+                steps=steps_data
             ))
         
         return results

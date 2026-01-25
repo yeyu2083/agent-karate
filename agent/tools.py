@@ -149,7 +149,7 @@ class JiraXrayClient:
                     return issue_type.get('id')
         return None
 
-    def get_or_create_test_issue(self, feature_name: str, scenario_name: str, parent_key: Optional[str] = None) -> Optional[str]:
+    def get_or_create_test_issue(self, feature_name: str, scenario_name: str, parent_key: Optional[str] = None, steps: List[dict] = []) -> Optional[str]:
         test_key = self.search_test_issue(f"{feature_name} - {scenario_name}")
         if not test_key:
             url = f"{self.settings.jira_base_url}/rest/api/3/issue"
@@ -157,6 +157,46 @@ class JiraXrayClient:
             # Intentar en orden incluyendo nombres en español
             issue_type_names = ["Test", "Prueba", "Task", "Tarea", "Story", "Historia"]
             
+            # Construir descripción detallada con pasos
+            description_content = [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Automated test from Karate feature: {feature_name}",
+                            "marks": [{"type": "strong"}]
+                        }
+                    ]
+                }
+            ]
+            
+            # Tabla de pasos si existen
+            if steps:
+                description_content.append({"type": "paragraph", "content": [{"type": "text", "text": "Execution Steps:"}]})
+                
+                # Crear tabla manual para pasos en formato ADF de Jira
+                # Nota: Las tablas ADF son complejas de construir manualmente sin librerías.
+                # Usaremos CodeBlock para logs formateados que es más seguro y legible.
+                steps_text = "Keyword | Step Name | Status | Duration (ms)\n"
+                steps_text += "--- | --- | --- | ---\n"
+                for step in steps:
+                    status_icon = "✅" if step.get('status') == 'passed' else "❌"
+                    steps_text += f"{step.get('keyword')} | {step.get('text')} | {status_icon} {step.get('status')} | {step.get('duration_ms'):.2f}\n"
+                    if step.get('error'):
+                         steps_text += f"> Error: {step.get('error')}\n"
+                
+                description_content.append({
+                    "type": "codeBlock",
+                    "attrs": {"language": "markdown"},
+                    "content": [{"type": "text", "text": steps_text}]
+                })
+            else:
+                description_content.append({
+                     "type": "paragraph",
+                     "content": [{"type": "text", "text": f"Scenario: {scenario_name}"}]
+                })
+
             for issue_type_name in issue_type_names:
                 # Obtener el ID dinámicamente
                 issue_type_id = self.get_issue_type_id(issue_type_name)
@@ -172,28 +212,9 @@ class JiraXrayClient:
                         "description": {
                             "version": 1,
                             "type": "doc",
-                            "content": [
-                                {
-                                    "type": "paragraph",
-                                    "content": [
-                                        {
-                                            "type": "text",
-                                            "text": f"Automated test from Karate feature: {feature_name}"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "type": "paragraph",
-                                    "content": [
-                                        {
-                                            "type": "text",
-                                            "text": f"Scenario: {scenario_name}"
-                                        }
-                                    ]
-                                }
-                            ]
+                            "content": description_content
                         },
-                        "labels": ["automated-test", "karate"]
+                        "labels": ["automated-test", "karate", "agent-created"]
                     }
                 }
                 response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
@@ -207,6 +228,7 @@ class JiraXrayClient:
                     
                     return created_key
                 else:
+
                     error_detail = response.json() if response.headers.get('content-type') == 'application/json' else response.text
                     print(f"  Tipo '{issue_type_name}' falló ({response.status_code}): {error_detail}")
                     print(f"  Payload enviado: {json.dumps(payload, indent=2)}")
@@ -231,6 +253,68 @@ class JiraXrayClient:
                 return False
         except Exception as e:
             print(f"✗ Error linking {test_key} to {parent_key}: {str(e)}")
+            return False
+
+    def link_issues(self, source_key: str, target_key: str, link_name: str = "Relates") -> bool:
+        """Generic link between two issues"""
+        # Note: Xray uses normal issue links for Test Executions -> Tests in simple mode
+        return self.link_to_parent(target_key, source_key)
+
+    def add_comment(self, issue_key: str, comment_body: str) -> bool:
+        url = f"{self.settings.jira_base_url}/rest/api/3/issue/{issue_key}/comment"
+        payload = {
+            "body": {
+                "version": 1,
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [{"type": "text", "text": comment_body}]
+                    }
+                ]
+            }
+        }
+        try:
+             response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
+             return response.status_code == 201
+        except:
+             return False
+
+    def transition_issue(self, issue_key: str, target_status_name: str) -> bool:
+        """Transition an issue to a new status (e.g. Done)"""
+        # 1. Get available transitions
+        url = f"{self.settings.jira_base_url}/rest/api/3/issue/{issue_key}/transitions"
+        try:
+            response = requests.get(url, headers=self.headers, auth=self.auth)
+            if response.status_code != 200:
+                print(f"⚠️ Could not fetch transitions for {issue_key}")
+                return False
+            
+            transitions = response.json().get('transitions', [])
+            target_transition_id = None
+            
+            for t in transitions:
+                if t['name'].lower() == target_status_name.lower():
+                    target_transition_id = t['id']
+                    break
+            
+            if not target_transition_id:
+                print(f"⚠️ Transition '{target_status_name}' not found for {issue_key}. Available: {[t['name'] for t in transitions]}")
+                return False
+            
+            # 2. Perform transition
+            post_payload = {"transition": {"id": target_transition_id}}
+            post_response = requests.post(url, headers=self.headers, auth=self.auth, json=post_payload)
+            
+            if post_response.status_code == 204:
+                print(f"✅ Issue {issue_key} moved to '{target_status_name}'")
+                return True
+            else:
+                print(f"❌ Failed to transition {issue_key}: {post_response.status_code}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error transitioning issue: {e}")
             return False
 
     def create_test_execution(self, parent_key: Optional[str] = None) -> Optional[str]:

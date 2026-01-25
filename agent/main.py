@@ -1,22 +1,10 @@
 import os
 import sys
 from dotenv import load_dotenv
-from .state import AgentState, TestResult
-from .karate_parser import KarateParser
-from .graph import create_agent_graph
-from .tools import JiraXraySettings, JiraXrayClient
-
-load_dotenv()
-
-
-# agent.py
-import os
-import sys
-from dotenv import load_dotenv
-from .state import AgentState, TestResult
-from .karate_parser import KarateParser
-from .graph import create_agent_graph
-from .tools import JiraXraySettings, JiraXrayClient
+from agent.state import AgentState, TestResult
+from agent.karate_parser import KarateParser
+from agent.graph import create_agent_graph
+from agent.tools import JiraXraySettings, JiraXrayClient
 
 load_dotenv()
 

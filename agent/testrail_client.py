@@ -95,7 +95,11 @@ class TestRailClient:
                 params={"suite_id": suite_id}
             )
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            # TestRail returns a dict with numeric keys, convert to list
+            if isinstance(data, dict):
+                return list(data.values())
+            return data if isinstance(data, list) else []
         except Exception as e:
             print(f"❌ Error getting sections: {e}")
             return []
@@ -123,7 +127,11 @@ class TestRailClient:
                 params={"suite_id": suite_id}
             )
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            # TestRail returns a dict with numeric keys, convert to list
+            if isinstance(data, dict):
+                return list(data.values())
+            return data if isinstance(data, list) else []
         except Exception as e:
             print(f"❌ Error getting cases: {e}")
             return []

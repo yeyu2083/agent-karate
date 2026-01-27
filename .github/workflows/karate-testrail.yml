@@ -97,7 +97,6 @@ jobs:
       # ===== 3. RUN KARATE TESTS =====
       - name: "Run Karate tests"
         id: karate
-        working-directory: ${{ env.KARATE_DIR }}
         run: |
           echo "🧪 Running Karate tests..."
           mvn clean test \
@@ -106,10 +105,10 @@ jobs:
           
           # Generate karate.json
           if [ -f target/karate-reports/karate-summary-json.txt ]; then
-            cp target/karate-reports/karate-summary-json.txt ../../karate.json
+            cp target/karate-reports/karate-summary-json.txt karate.json
             echo "✓ Karate report copied to root"
           else
-            cp target/karate-reports/karate.json ../../karate.json 2>/dev/null || echo "⚠️ No Karate report found"
+            cp target/karate-reports/karate.json . 2>/dev/null || echo "⚠️ No Karate report found"
           fi
           
           if [ "$TEST_FAILED" = "true" ]; then

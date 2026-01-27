@@ -353,7 +353,7 @@ class JiraXrayClient:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
         
         # Test Plan names to try
-        plan_types = ["Test Plan", "Plan de Pruebas", "Epic"]
+        plan_types = ["test-plan", "Test Plan", "Plan de Pruebas", "Epic"]
         issue_type_id = None
         used_type = None
         
@@ -393,18 +393,75 @@ class JiraXrayClient:
             }
         }
         
+        # Add fields for test-plan type if it's the X-Ray specific type
+        if used_type and used_type.lower() == "test-plan":
+            payload["fields"]["assignee"] = {"name": self.settings.jira_email.split("@")[0]}
+        
         response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
         if response.status_code == 201:
             plan_key = response.json()["key"]
             print(f"✓ Created Test Plan: {plan_key}")
             return plan_key
         else:
-            print(f"✗ Failed to create Test Plan: {response.status_code}")
+            error_msg = response.json() if response.headers.get('content-type') == 'application/json' else response.text
+            print(f"✗ Failed to create Test Plan ({used_type}): {response.status_code}")
+            print(f"  Error: {error_msg}")
+            print(f"  Payload: {json.dumps(payload, indent=2)}")
+            
+            # Fallback: Try with Epic if test-plan failed
+            if used_type and used_type.lower() == "test-plan":
+                print(f"  Falling back to Epic...")
+                return self._create_epic_as_test_plan(summary)
+            return None
+    
+    def _create_epic_as_test_plan(self, summary: str) -> Optional[str]:
+        """Fallback: Create an Epic to use as Test Plan"""
+        from datetime import datetime
+        
+        url = f"{self.settings.jira_base_url}/rest/api/3/issue"
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        
+        issue_type_id = self.get_issue_type_id("Epic")
+        if not issue_type_id:
+            print("⚠️ Could not find Epic issue type.")
+            return None
+        
+        payload = {
+            "fields": {
+                "project": {"key": self.settings.xray_project_key},
+                "summary": f"Test Plan (Epic) - {summary} - {timestamp}",
+                "issuetype": {"id": issue_type_id},
+                "description": {
+                    "version": 1,
+                    "type": "doc",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "Test Plan container (Epic fallback)"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+        
+        response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
+        if response.status_code == 201:
+            epic_key = response.json()["key"]
+            print(f"✓ Created Epic (Test Plan fallback): {epic_key}")
+            return epic_key
+        else:
+            print(f"✗ Fallback Epic also failed: {response.status_code}")
             return None
 
     def create_test_execution(self, parent_key: Optional[str] = None, test_plan_key: Optional[str] = None) -> Optional[str]:
         """Create a Test Execution issue in Xray for tracking test runs"""
         from datetime import datetime
+        import os
         
         url = f"{self.settings.jira_base_url}/rest/api/3/issue"
         
@@ -414,12 +471,14 @@ class JiraXrayClient:
             summary = f"Test Execution for {parent_key} - {timestamp}"
         
         # Intentar encontrar issue type 'Test Execution' o 'Ejecución de Prueba' o 'Task'
-        execution_types = ["Test Execution", "Ejecución de Prueba", "Task", "Tarea"]
+        execution_types = ["test-execution", "Test Execution", "Ejecución de Prueba", "Task", "Tarea"]
         issue_type_id = None
+        used_type = None
         
         for et in execution_types:
             issue_type_id = self.get_issue_type_id(et)
             if issue_type_id:
+                used_type = et
                 print(f"Using issue type for execution: {et} ({issue_type_id})")
                 break
         
@@ -466,18 +525,74 @@ class JiraXrayClient:
                         }
                     ]
                 },
-                "labels": ["automated-execution", "karate"]
+                "labels": ["automated-execution", "karate", "agent-created"]
             }
         }
+        
+        # Add X-Ray specific fields for test-execution type
+        if used_type and used_type.lower() == "test-execution":
+            # These are typical X-Ray fields
+            payload["fields"]["assignee"] = {"name": self.settings.jira_email.split("@")[0]}
+            payload["fields"]["environment"] = "Automated"
+            payload["fields"]["revision"] = os.getenv("GITHUB_SHA", "unknown")[:7]
+            payload["fields"]["testExecutionType"] = "Automated"
         
         response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
         if response.status_code == 201:
             exec_key = response.json()["key"]
             print(f"✓ Created Test Execution: {exec_key}")
-            
             return exec_key
         else:
-            print(f"✗ Failed to create Test Execution: {response.status_code}")
+            error_msg = response.json() if response.headers.get('content-type') == 'application/json' else response.text
+            print(f"✗ Failed to create Test Execution ({used_type}): {response.status_code}")
+            print(f"  Error: {error_msg}")
+            print(f"  Payload: {json.dumps(payload, indent=2)}")
+            
+            # Fallback: Try with Task if test-execution failed
+            if used_type and used_type.lower() == "test-execution":
+                print(f"  Falling back to Task...")
+                return self._create_task_as_test_execution(summary, parent_key, test_plan_key)
+            return None
+    
+    def _create_task_as_test_execution(self, summary: str, parent_key: Optional[str], test_plan_key: Optional[str]) -> Optional[str]:
+        """Fallback: Create a Task to use as Test Execution"""
+        url = f"{self.settings.jira_base_url}/rest/api/3/issue"
+        
+        issue_type_id = self.get_issue_type_id("Task")
+        if not issue_type_id:
+            print("⚠️ Could not find Task issue type.")
+            return None
+        
+        payload = {
+            "fields": {
+                "project": {"key": self.settings.xray_project_key},
+                "summary": f"Test Execution (Task) - {summary}",
+                "issuetype": {"id": issue_type_id},
+                "description": {
+                    "version": 1,
+                    "type": "doc",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "Test Execution container (Task fallback) from automated Karate tests"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+        
+        response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
+        if response.status_code == 201:
+            task_key = response.json()["key"]
+            print(f"✓ Created Task (Test Execution fallback): {task_key}")
+            return task_key
+        else:
+            print(f"✗ Fallback Task also failed: {response.status_code}")
             return None
     
     def link_test_plan_to_parent(self, test_plan_key: str, parent_key: str) -> bool:

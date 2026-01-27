@@ -1,0 +1,197 @@
+name: Karate → TestRail
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - feature/*
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  KARATE_DIR: src/test/java
+  TESTRAIL_PROJECT_ID: 1
+  TESTRAIL_SUITE_ID: 1
+
+jobs:
+  test-and-report:
+    name: Run Karate & Report to TestRail
+    runs-on: ubuntu-latest
+    outputs:
+      test_run_id: ${{ steps.testrail.outputs.run_id }}
+    
+    steps:
+      # ===== 1. EXTRACT METADATA =====
+      - name: "Extract build metadata from branch/commit"
+        id: metadata
+        run: |
+          # Extract branch name
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          BRANCH_NAME="${BRANCH_NAME#refs/pull/}"
+          BRANCH_NAME="${BRANCH_NAME%/merge}"
+          
+          # Get commit info
+          COMMIT_SHA="${{ github.sha }}"
+          COMMIT_MESSAGE=$(git log -1 --pretty=%B 2>/dev/null || echo "")
+          BUILD_NUMBER="${{ github.run_number }}"
+          
+          # Extract Jira issue from branch name (e.g., SCRUM-4 from "feature/SCRUM-4-auth")
+          if [[ $BRANCH_NAME =~ ([A-Z]+-[0-9]+) ]]; then
+            JIRA_ISSUE="${BASH_REMATCH[1]}"
+          else
+            JIRA_ISSUE=""
+          fi
+          
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "commit_message=$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "jira_issue=$JIRA_ISSUE" >> $GITHUB_OUTPUT
+          
+          echo "Build #$BUILD_NUMBER on branch $BRANCH_NAME"
+          if [ -n "$JIRA_ISSUE" ]; then
+            echo "Extracted Jira issue: $JIRA_ISSUE"
+          fi
+      
+      # ===== 2. CHECKOUT CODE =====
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # ===== 3. SETUP JAVA + MAVEN =====
+      - name: "Set up JDK 17"
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      
+      # ===== 4. RUN KARATE TESTS =====
+      - name: "Run Karate tests"
+        id: karate
+        working-directory: ${{ env.KARATE_DIR }}
+        run: |
+          echo "Running Karate tests..."
+          mvn clean test \
+            -Dkarate.outputDir=target/karate-reports \
+            -DargLine="-Dfile.encoding=UTF-8" || TEST_FAILED=true
+          
+          # Generate karate.json
+          if [ -f target/karate-reports/karate-summary-json.txt ]; then
+            cp target/karate-reports/karate-summary-json.txt ../../karate.json
+            echo "✓ Karate report copied"
+          else
+            echo "⚠️ No Karate report found"
+            cp target/karate-reports/karate.json ../../karate.json || true
+          fi
+          
+          if [ "$TEST_FAILED" = "true" ]; then
+            exit 1
+          fi
+        continue-on-error: true
+      
+      # ===== 5. SETUP PYTHON ENVIRONMENT =====
+      - name: "Set up Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: 'agent/requirements.txt'
+      
+      - name: "Install Python dependencies"
+        run: |
+          cd agent
+          pip install -r requirements.txt
+      
+      # ===== 6. SUBMIT TO TESTRAIL =====
+      - name: "Submit test results to TestRail"
+        id: testrail
+        env:
+          TESTRAIL_URL: ${{ secrets.TESTRAIL_URL }}
+          TESTRAIL_EMAIL: ${{ secrets.TESTRAIL_EMAIL }}
+          TESTRAIL_API_KEY: ${{ secrets.TESTRAIL_API_KEY }}
+          
+          # Build metadata
+          BUILD_NUMBER: ${{ steps.metadata.outputs.build_number }}
+          BRANCH_NAME: ${{ steps.metadata.outputs.branch_name }}
+          COMMIT_SHA: ${{ steps.metadata.outputs.commit_sha }}
+          COMMIT_MESSAGE: ${{ steps.metadata.outputs.commit_message }}
+          JIRA_PARENT_ISSUE: ${{ steps.metadata.outputs.jira_issue }}
+          
+          # LLM configuration
+          LLM_PROVIDER: glm
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          
+          # Paths
+          KARATE_JSON_PATH: karate.json
+        
+        run: |
+          cd agent
+          python main.py 2>&1 | tee ../testrail-output.log
+        continue-on-error: true
+      
+      # ===== 7. GENERATE PR COMMENT =====
+      - name: "Comment PR with TestRail results"
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            let comment = "## TestRail Test Results\n\n";
+            
+            // Try to read output log
+            try {
+              const output = fs.readFileSync('./testrail-output.log', 'utf8');
+              
+              // Extract key metrics
+              if (output.includes('✓')) {
+                comment += "✅ Tests executed and results submitted to TestRail\n\n";
+              }
+              
+              if (output.includes('Created run')) {
+                const runMatch = output.match(/Created run #(\d+)/);
+                if (runMatch) {
+                  comment += `🔗 [View Run #${runMatch[1]}](${process.env.TESTRAIL_URL})\n\n`;
+                }
+              }
+              
+              comment += "```\n" + output.slice(-1000) + "\n```\n";
+            } catch (e) {
+              comment += "Could not read test output\n";
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+      
+      # ===== 8. UPLOAD ARTIFACTS =====
+      - name: "Upload test artifacts"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ github.run_number }}
+          path: |
+            karate.json
+            testrail-output.log
+            src/test/java/target/karate-reports/
+          retention-days: 30
+      
+      # ===== 9. DETERMINE JOB STATUS =====
+      - name: "Finalize workflow"
+        if: always()
+        run: |
+          if [ "${{ steps.karate.outcome }}" == "failure" ]; then
+            echo "⚠️ Karate tests failed"
+          fi
+          if [ "${{ steps.testrail.outcome }}" == "failure" ]; then
+            echo "⚠️ TestRail submission failed"
+          fi
+          echo "✅ Workflow complete"

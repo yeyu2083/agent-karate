@@ -1,4 +1,8 @@
-# nodes.py
+# nodes.py - REFACTORED FOR TESTRAIL
+"""
+Agent workflow nodes for TestRail integration
+"""
+
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -6,59 +10,55 @@ from langchain_community.chat_models import ChatZhipuAI
 from langchain_community.llms import Ollama
 from langchain_core.prompts import ChatPromptTemplate
 from .state import AgentState
-from .tools import JiraXrayClient, JiraXraySettings
+from .testrail_client import TestRailClient, TestRailSettings
+from .testrail_sync import TestRailSync
+from .testrail_runner import TestRailRunner
 import os
 
 
-def get_llm(settings: JiraXraySettings):
-    provider = settings.llm_provider.lower()
+def get_llm(llm_provider: str = "glm"):
+    """Get LLM based on provider"""
+    provider = llm_provider.lower()
     
     if provider == "openai":
-        if not settings.openai_api_key:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
             raise ValueError("OPENAI_API_KEY not set")
-        return ChatOpenAI(
-            api_key=settings.openai_api_key,
-            model=settings.openai_model
-        )
+        return ChatOpenAI(api_key=api_key, model="gpt-4o")
     
     elif provider == "azure":
-        if not settings.azure_openai_api_key:
+        api_key = os.getenv("AZURE_OPENAI_API_KEY")
+        if not api_key:
             raise ValueError("AZURE_OPENAI_API_KEY not set")
         return AzureChatOpenAI(
-            api_key=settings.azure_openai_api_key,
-            azure_endpoint=settings.azure_openai_endpoint,
-            api_version=settings.azure_openai_api_version,
-            deployment_name=settings.azure_openai_deployment_name
+            api_key=api_key,
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+            deployment_name=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
         )
     
     elif provider == "anthropic":
-        if not settings.anthropic_api_key:
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
             raise ValueError("ANTHROPIC_API_KEY not set")
-        return ChatAnthropic(
-            api_key=settings.anthropic_api_key,
-            model=settings.anthropic_model or "claude-3-opus-20240229"
-        )
+        return ChatAnthropic(api_key=api_key, model="claude-3-opus-20240229")
 
     elif provider == "google":
-        if not settings.google_api_key:
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
             raise ValueError("GOOGLE_API_KEY not set")
-        return ChatGoogleGenerativeAI(
-            api_key=settings.google_api_key,
-            model=settings.google_model
-        )
+        return ChatGoogleGenerativeAI(api_key=api_key, model="gemini-1.5-pro")
 
     elif provider in ["zhipu", "glm", "zai"]:
-        if not settings.zai_api_key:
+        api_key = os.getenv("ZAI_API_KEY")
+        if not api_key:
             raise ValueError("ZAI_API_KEY not set")
-        return ChatZhipuAI(
-            api_key=settings.zai_api_key,
-            model=settings.zai_model
-        )
+        return ChatZhipuAI(api_key=api_key, model="GLM-4.7-flash")
 
     elif provider == "ollama":
         return Ollama(
-            base_url=settings.ollama_base_url,
-            model=settings.ollama_model
+            base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+            model=os.getenv("OLLAMA_MODEL", "llama3")
         )
     
     else:
@@ -66,17 +66,17 @@ def get_llm(settings: JiraXraySettings):
 
 
 def analyze_results_node(state: AgentState) -> AgentState:
-    settings = JiraXraySettings()
+    """Analyze test results with LLM (fallback to summary if LLM fails)"""
+    llm_provider = os.getenv("LLM_PROVIDER", "glm")
     
     try:
-        llm = get_llm(settings)
+        llm = get_llm(llm_provider)
         
-        # Preparar los resultados de las pruebas para el LLM
+        # Prepare results summary
         total_tests = len(state.get('karate_results', []))
         passed_tests = sum(1 for result in state.get('karate_results', []) if result.status == "passed")
         failed_tests = total_tests - passed_tests
         
-        # Crear un resumen de los resultados
         results_summary = f"""
         Total de pruebas: {total_tests}
         Pruebas exitosas: {passed_tests}
@@ -85,7 +85,6 @@ def analyze_results_node(state: AgentState) -> AgentState:
         Detalles de las pruebas fallidas:
         """
         
-        # Agregar detalles de las pruebas fallidas
         for result in state.get('karate_results', []):
             if result.status == "failed":
                 results_summary += f"""
@@ -94,25 +93,20 @@ def analyze_results_node(state: AgentState) -> AgentState:
                 - Error: {result.error_message or 'No error message provided'}
                 """
         
-        # Prompt mejorado para el LLM
+        # Call LLM
         prompt = ChatPromptTemplate.from_messages([
             ("system", """Eres un analista de QA especializado en pruebas de automatización con Karate.
-            Analiza los siguientes resultados de pruebas y proporciona un resumen detallado que incluya:
-            1. Un resumen ejecutivo de los resultados
-            2. Las principales causas de los fallos (si hay alguna)
-            3. Recomendaciones para mejorar los resultados
-            4. Una evaluación de la calidad general del código de pruebas
-            
-            Usa un tono profesional y estructurado suitable para un informe técnico."""),
+            Analiza los siguientes resultados de pruebas y proporciona un resumen detallado."""),
             ("human", "{results}")
         ])
         
         chain = prompt | llm
         response = chain.invoke({"results": results_summary})
         state["final_output"] = response.content
+    
     except Exception as e:
-        print(f"LLM error (using direct results): {e}")
-        # Fallback a un resumen simple si el LLM falla
+        print(f"⚠️ LLM analysis failed: {e}")
+        # Fallback to simple summary
         total_tests = len(state.get('karate_results', []))
         passed_tests = sum(1 for result in state.get('karate_results', []) if result.status == "passed")
         failed_tests = total_tests - passed_tests
@@ -122,134 +116,127 @@ def analyze_results_node(state: AgentState) -> AgentState:
         - Total tests: {total_tests}
         - Passed: {passed_tests}
         - Failed: {failed_tests}
-        
-        Note: Detailed analysis unavailable due to LLM error: {str(e)}
         """
     
     state["current_step"] = "analysis_complete"
     return state
 
 
-def map_to_xray_node(state: AgentState) -> AgentState:
-    settings = JiraXraySettings()
-    client = JiraXrayClient(settings)
-    
-    # Get parent issue key from environment (extracted from branch name)
-    parent_issue_key = os.getenv("JIRA_PARENT_ISSUE", "").strip()
+def map_to_testrail_node(state: AgentState) -> AgentState:
+    """Map test results to TestRail and submit"""
     
     try:
-        print(f"\n🏗️ Building X-Ray Test Hierarchy")
-        if parent_issue_key:
-            print(f"   Parent US: {parent_issue_key}")
+        print(f"\n🏗️ Building TestRail Test Execution")
         
-        # STEP 1: Create Test Plan (if we have a parent)
-        test_plan_key = None
-        if parent_issue_key:
-            test_plan_key = client.create_test_plan(f"Test Plan for {parent_issue_key}")
-            if test_plan_key:
-                print(f"   ✅ Created Test Plan: {test_plan_key}")
-                # Link Test Plan to parent US
-                client.link_test_plan_to_parent(test_plan_key, parent_issue_key)
+        # Initialize TestRail
+        testrail_settings = TestRailSettings()
+        testrail_client = TestRailClient(testrail_settings)
         
-        # STEP 2: Create individual test issues
-        print(f"\n📋 Creating Test Issues")
-        tests = []
-        test_keys = []
+        # Verify connection
+        if not testrail_client.check_connection():
+            raise Exception("Cannot connect to TestRail")
         
-        for result in state.get('karate_results', []):
-            test_key = client.get_or_create_test_issue(
-                result.feature, 
-                result.scenario, 
-                None,
-                steps=result.steps
-            )
-            
-            if test_key:
-                test_keys.append(test_key)
-                tests.append({
-                    "testKey": test_key,
-                    "status": "PASS" if result.status == "passed" else "FAIL",
-                    "comment": result.error_message or "Test executed successfully",
-                    "start": str(int(result.duration * 1000))
-                })
+        # Get metadata from environment
+        build_number = os.getenv("BUILD_NUMBER", "unknown")
+        branch_name = os.getenv("BRANCH_NAME", "unknown")
+        commit_sha = os.getenv("COMMIT_SHA", "")[:7]
+        commit_message = os.getenv("COMMIT_MESSAGE", "")
+        jira_issue = os.getenv("JIRA_PARENT_ISSUE", "").strip() or None
         
-        print(f"   ✅ Created {len(test_keys)} test issues: {', '.join(test_keys)}")
-        
-        # STEP 3: Create Test Execution container
-        test_execution_key = None
-        if parent_issue_key or test_plan_key:
-            test_execution_key = client.create_test_execution(parent_issue_key, test_plan_key)
-            if test_execution_key:
-                print(f"   ✅ Created Test Execution: {test_execution_key}")
-                
-                # Link all tests to the test execution container
-                for test_key in test_keys:
-                    client.link_test_to_execution(test_execution_key, test_key)
-                
-                # STEP 4: Link Test Execution to parent issue (US)
-                if parent_issue_key:
-                    client.link_test_execution_to_parent(test_execution_key, parent_issue_key)
-                
-                # STEP 5: Link Test Execution to Test Plan
-                if test_plan_key:
-                    client.link_execution_to_test_plan(test_execution_key, test_plan_key)
-        
-        # Prepare payload
-        payload = {
-            "tests": tests,
-            "parent_issue": parent_issue_key or "None",
-            "test_plan": test_plan_key or "None",
-            "test_execution": test_execution_key or "None"
+        build_data = {
+            'build_number': build_number,
+            'branch': branch_name,
+            'commit_sha': commit_sha,
+            'commit_message': commit_message,
+            'jira_issue': jira_issue,
+            'environment': 'dev'
         }
         
-        state["xray_import_payload"] = payload
-        state["current_step"] = "mapped_to_xray"
-        state["parent_issue"] = parent_issue_key or "None"
-        state["test_execution"] = test_execution_key or "None"
+        test_results = state.get('karate_results', [])
+        
+        if not test_results:
+            print("⚠️ No test results to submit")
+            state["current_step"] = "no_results"
+            return state
+        
+        # ===== STEP 1: Sync test cases to TestRail =====
+        print(f"\n📋 Syncing test cases to TestRail")
+        sync = TestRailSync(
+            testrail_client,
+            testrail_settings.testrail_project_id,
+            testrail_settings.testrail_suite_id
+        )
+        
+        case_id_map = sync.sync_cases_from_karate(test_results)
+        
+        if not case_id_map:
+            raise Exception("Failed to sync test cases")
+        
+        print(f"✓ Synced {len(case_id_map)} test cases")
+        
+        # ===== STEP 2: Create TestRail run =====
+        print(f"\n🚀 Creating TestRail run")
+        runner = TestRailRunner(testrail_client)
+        
+        case_ids = list(case_id_map.values())
+        run_id = runner.create_run_from_build(
+            testrail_settings.testrail_project_id,
+            testrail_settings.testrail_suite_id,
+            build_data,
+            case_ids
+        )
+        
+        if not run_id:
+            raise Exception("Failed to create TestRail run")
+        
+        # ===== STEP 3: Submit test results =====
+        print(f"\n📊 Submitting test results")
+        success = runner.submit_results(run_id, test_results, case_id_map)
+        
+        if not success:
+            raise Exception("Failed to submit results")
+        
+        # ===== STEP 4: Attach artifact =====
+        print(f"\n📎 Attaching artifact")
+        karate_json_path = os.getenv("KARATE_JSON_PATH", "karate.json")
+        if os.path.exists(karate_json_path):
+            runner.attach_artifact(run_id, karate_json_path)
+        
+        # ===== STEP 5: Generate report =====
+        print(f"\n📝 Generating report")
+        report = runner.generate_run_report(run_id)
         
         # Print hierarchy
-        print(f"\n✅ Test Hierarchy Structure:")
-        if parent_issue_key:
-            print(f"   {parent_issue_key} (US/Historia)")
-            if test_plan_key:
-                print(f"   ├─ is tested by: {test_plan_key} (Test Plan)")
-            if test_execution_key:
-                print(f"   ├─ is tested by: {test_execution_key} (Test Execution)")
-                for test_key in test_keys:
-                    print(f"   │  ├─ {test_key} (Test)")
-                if test_plan_key:
-                    print(f"   └─ {test_plan_key} (Test Plan)")
-                    print(f"      ├─ contains: {test_execution_key} (Test Execution)")
-                    for test_key in test_keys:
-                        print(f"      │  ├─ {test_key} (Test)")
-        else:
-            if test_execution_key:
-                print(f"   {test_execution_key} (Test Execution)")
-                for test_key in test_keys:
-                    print(f"   ├─ {test_key} (Test)")
+        print(f"\n✅ TestRail Execution Complete:")
+        print(f"   Project: API Automation")
+        print(f"   Suite: Authentication")
+        print(f"   Run: #{run_id}")
+        print(f"   Build: #{build_number} - {branch_name}")
         
-        # STEP 6: Transition Historia de Usuario if all tests pass
-        if parent_issue_key:
-            all_passed = all(r.status == "passed" for r in state.get('karate_results', []))
-            if all_passed:
-                print(f"\n🌟 All tests passed! Transitioning {parent_issue_key} to Done...")
-                if not client.transition_issue(parent_issue_key, "Done"):
-                    if not client.transition_issue(parent_issue_key, "Finalizado"):
-                        client.transition_issue(parent_issue_key, "Tested")
-            else:
-                failed_count = sum(1 for r in state.get('karate_results', []) if r.status != "passed")
-                print(f"⚠️ {failed_count} test(s) failed. Not transitioning {parent_issue_key}.")
-
+        if jira_issue:
+            print(f"   Jira: {jira_issue}")
+        
+        # Update state
+        state["testrail_run"] = {
+            "run_id": run_id,
+            "case_id_map": case_id_map,
+            "results_submitted": len(case_id_map),
+            "errors": []
+        }
+        state["testrail_sync_status"] = "SUCCESS"
+        state["testrail_report"] = report
+        state["current_step"] = "mapped_to_testrail"
+    
     except Exception as e:
-        print(f"❌ Error creating tests: {e}")
-        state["current_step"] = "test_creation_error"
-        state["error_message"] = str(e)
+        print(f"❌ Error in TestRail execution: {e}")
+        state["testrail_sync_status"] = "FAILED"
+        state["testrail_error"] = str(e)
+        state["current_step"] = "testrail_error"
     
     return state
 
 
 def upload_to_jira_node(state: AgentState) -> AgentState:
-    """Note: Tests are already created and linked in map_to_xray_node. This is a no-op."""
+    """Optional: Link TestRail run to Jira Historia (future enhancement)"""
     state["current_step"] = "completed"
-    state["jira_response"] = {"status": "success", "message": "Tests already linked in map_to_xray_node"}
     return state

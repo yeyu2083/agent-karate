@@ -86,36 +86,9 @@ class JiraXrayClient:
         return None
 
     def import_execution_to_xray(self, payload: dict) -> Dict[str, Any]:
-        """Import execution results to Xray"""
-        # Determine if we are on Cloud or Server/DC
-        is_cloud = "atlassian.net" in self.settings.jira_base_url
-        
-        if is_cloud:
-            # Xray Cloud uses a separate API endpoint and authentication mechanism (Client ID/Secret)
-            # which is different from Jira Basic Auth.
-            # Using the internal raven proxy usually doesn't work with API tokens.
-            # However, for simplicity, we will try the /import/execution endpoint that sometimes works 
-            # if the plugin is configured to accept it, OR we skip it if we don't have separate credentials.
-            
-            # If we don't have Xray Cloud client credentials, we unfortunately can't use the Xray API directly.
-            # But since we already created the Test Execution manually in 'map_to_xray_node', 
-            # and we are not using the Xray 'import' feature to CREATE the execution but to UPDATE it?
-            # Actually, the payload constructed in 'map_to_xray_node' is for the Xray Import API.
-            
-            # If we are manually creating issues, we might just want to update the status of the run.
-            # Since integrating full Xray Cloud Auth is complex without ClientID/Secret, 
-            # and likely the user only has Jira credentials, we will default to skipping this step strictly 
-            # and relying on the 'Test Execution' issue created in 'map_to_xray_node'.
-            
-            print("⚠️ Xray Cloud detected. Skipping direct Xray Import API call as it requires separate credentials.")
-            print("ℹ️ The Test Execution issue has been created in Jira manually.")
-            return {"status": "skipped", "reason": "Xray Cloud requires Client ID/Secret"}
-            
-        else:
-            # Jira Server / Data Center
-            url = f"{self.settings.jira_base_url}/rest/raven/2.0/import/execution"
-            response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
-            return response.json() if response.status_code == 200 else {"error": response.text}
+        """Skip Xray import - we handle tests via Jira issues directly"""
+        print("ℹ️ Tests are managed as Jira issues, not via Xray import API")
+        return {"status": "skipped", "reason": "Using native Jira issue tracking"}
 
     def get_issue_type_id(self, type_name: str) -> Optional[str]:
         """Get the ID of an issue type by name from the project configuration"""
@@ -254,22 +227,40 @@ class JiraXrayClient:
     def link_to_parent(self, test_key: str, parent_key: str) -> bool:
         """Link a test issue to a parent issue (Epic, Story, Task, etc.)"""
         try:
-            url = f"{self.settings.jira_base_url}/rest/api/3/issue/{test_key}/link"
+            url = f"{self.settings.jira_base_url}/rest/api/3/issue/{parent_key}/link"
+            
+            # The parent issue receives the link FROM the test
+            # So: PARENT "is tested by" TEST
             payload = {
-                "outwardIssue": {"key": parent_key},
+                "inwardIssue": {"key": test_key},
                 "type": {"name": "is tested by"}
             }
             response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
+            
             if response.status_code == 201:
-                print(f"✓ Linked {test_key} to {parent_key}")
+                print(f"✓ Linked: {parent_key} is tested by {test_key}")
                 return True
             elif response.status_code == 404:
-                # Parent issue doesn't exist - log but don't fail
-                print(f"⚠️ Parent issue {parent_key} not found in Jira (404). Skipping link.")
+                print(f"⚠️ Parent issue {parent_key} not found. Skipping link.")
                 return False
             else:
-                print(f"⚠️ Failed to link {test_key} to {parent_key}: {response.status_code}")
-                return False
+                # Fallback: try alternative link types
+                print(f"⚠️ Link type 'is tested by' failed ({response.status_code}). Trying 'relates to'...")
+                
+                url = f"{self.settings.jira_base_url}/rest/api/3/issue/{test_key}/link"
+                payload = {
+                    "outwardIssue": {"key": parent_key},
+                    "type": {"name": "relates to"}
+                }
+                response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
+                
+                if response.status_code == 201:
+                    print(f"✓ Linked {test_key} relates to {parent_key}")
+                    return True
+                else:
+                    print(f"⚠️ Failed to link {test_key} to {parent_key}")
+                    return False
+            
         except Exception as e:
             print(f"⚠️ Error linking {test_key} to {parent_key}: {str(e)}")
             return False

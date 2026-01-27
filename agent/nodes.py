@@ -195,21 +195,7 @@ def map_to_xray_node(state: AgentState) -> AgentState:
 
 
 def upload_to_jira_node(state: AgentState) -> AgentState:
-    settings = JiraXraySettings()
-    client = JiraXrayClient(settings)
-    
-    payload = state.get("xray_import_payload")
-    if payload:
-        try:
-            response = client.import_execution_to_xray(payload)
-            state["jira_response"] = response
-            state["current_step"] = "uploaded_to_jira"
-        except Exception as e:
-            print(f"Error uploading to Jira: {e}")
-            state["current_step"] = "jira_upload_error"
-            state["error_message"] = str(e)
-    else:
-        print("No payload to upload to Jira")
-        state["current_step"] = "no_payload"
-    
+    """Note: Tests are already created and linked in map_to_xray_node. This is a no-op."""
+    state["current_step"] = "completed"
+    state["jira_response"] = {"status": "success", "message": "Tests already linked in map_to_xray_node"}
     return state

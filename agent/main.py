@@ -82,6 +82,8 @@ def main():
     
     # Sync test cases
     print("\n📝 Syncing test cases...")
+    print(f"   Using Project ID: {settings.testrail_project_id}")
+    print(f"   Using Suite ID: {settings.testrail_suite_id}")
     try:
         sync = TestRailSync(
             client,
@@ -91,7 +93,9 @@ def main():
         case_id_map = sync.sync_cases_from_karate(results)
         print(f"✓ Synced {len(case_id_map)} test cases")
     except Exception as e:
+        import traceback
         print(f"❌ Sync error: {e}")
+        print(f"   {traceback.format_exc()}")
         return
     
     # Create test run

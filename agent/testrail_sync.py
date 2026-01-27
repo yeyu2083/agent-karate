@@ -36,7 +36,7 @@ class TestRailSync:
         else:
             # Use first section
             section_id = sections[0]['id']
-            print(f"Using section: {sections[0]['name']} (ID: {section_id})")
+            print(f"✓ Using section: {sections[0]['name']} (ID: {section_id})")
         
         for result in test_results:
             automation_id = f"{result.feature}.{result.scenario}"
@@ -59,6 +59,8 @@ class TestRailSync:
                     if created:
                         print(f"✓ Created case #{created['id']}: {automation_id}")
                         case_map[automation_id] = created['id']
+                else:
+                    print(f"⚠️ Cannot create case without section_id: {automation_id}")
         
         return case_map
     

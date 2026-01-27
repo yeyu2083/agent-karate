@@ -5,7 +5,7 @@ Feature: API de Posts - Pruebas de Publicaciones
     * url baseUrl
     * header Content-Type = 'application/json'
 
-  @smoke @get @regression @SCRUM-11
+  @smoke @get
   Scenario: Listar todos los posts
     Given path '/posts'
     When method GET
@@ -14,7 +14,7 @@ Feature: API de Posts - Pruebas de Publicaciones
     And match response[0] == { userId: '#number', id: '#number', title: '#string', body: '#string' }
     And match response.length >= 100
 
-  @smoke @get @regression @SCRUM-11
+  @smoke @get
   Scenario: Obtener un post específico
     Given path '/posts/1'
     When method GET

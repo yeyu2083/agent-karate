@@ -85,164 +85,6 @@ class JiraXrayClient:
                 return data["issues"][0]["key"]
         return None
 
-    def search_issue(self, jql: str) -> Optional[str]:
-        """Search for an issue using JQL and return the first matching issue key"""
-        try:
-            url = f"{self.settings.jira_base_url}/rest/api/3/search"
-            params = {
-                "jql": jql,
-                "fields": "key",
-                "maxResults": 1
-            }
-            response = requests.get(url, headers=self.headers, auth=self.auth, params=params)
-            if response.status_code == 200:
-                issues = response.json().get("issues", [])
-                if issues:
-                    return issues[0]["key"]
-            return None
-        except Exception as e:
-            print(f"❌ Error searching for issue: {e}")
-            return None
-
-    def find_or_create_test_plan(self, us_key: str) -> Optional[str]:
-        """Find existing test plan for US or create a new one (idempotent)"""
-        try:
-            # Search for existing test plan linked to this US
-            jql = f'type = "test-plan" AND text ~ "{us_key}"'
-            existing_key = self.search_issue(jql)
-            
-            if existing_key:
-                print(f"✓ Found existing test plan: {existing_key}")
-                return existing_key
-            
-            # Create new test plan
-            return self.create_test_plan(us_key)
-        except Exception as e:
-            print(f"❌ Error in find_or_create_test_plan: {e}")
-            return None
-
-    def create_test_plan(self, us_key: str) -> Optional[str]:
-        """Create a test-plan issue linked to a User Story"""
-        try:
-            url = f"{self.settings.jira_base_url}/rest/api/3/issue"
-            
-            issue_type_id = self.get_issue_type_id("test-plan")
-            if not issue_type_id:
-                print("⚠️ test-plan issue type not found in project")
-                return None
-            
-            # Format the plan name and description with ADF
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-            
-            payload = {
-                "fields": {
-                    "project": {"key": self.settings.xray_project_key},
-                    "summary": f"Test Plan for {us_key}",
-                    "issuetype": {"id": issue_type_id},
-                    "description": {
-                        "version": 1,
-                        "type": "doc",
-                        "content": [
-                            {
-                                "type": "paragraph",
-                                "content": [
-                                    {
-                                        "type": "text",
-                                        "text": f"Test Plan for User Story: {us_key}",
-                                        "marks": [{"type": "strong"}]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "paragraph",
-                                "content": [{"type": "text", "text": f"Created: {timestamp}"}]
-                            },
-                            {
-                                "type": "paragraph",
-                                "content": [{"type": "text", "text": "This test plan contains all test cycles and individual tests for validation."}]
-                            }
-                        ]
-                    },
-                    "labels": ["test-plan", "automated", us_key.lower()]
-                }
-            }
-            
-            response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
-            if response.status_code == 201:
-                test_plan_key = response.json()["key"]
-                print(f"✅ Created test plan: {test_plan_key}")
-                
-                # Link test plan to US
-                self.link_to_parent(test_plan_key, us_key)
-                return test_plan_key
-            else:
-                error_detail = response.json() if response.headers.get('content-type') == 'application/json' else response.text
-                print(f"❌ Failed to create test plan: {response.status_code} - {error_detail}")
-                return None
-        except Exception as e:
-            print(f"❌ Error creating test plan: {e}")
-            return None
-
-    def create_test_cycle(self, test_plan_key: str, cycle_name: str) -> Optional[str]:
-        """Create a test-cycle issue linked to a test-plan"""
-        try:
-            url = f"{self.settings.jira_base_url}/rest/api/3/issue"
-            
-            issue_type_id = self.get_issue_type_id("test-cycle")
-            if not issue_type_id:
-                print("⚠️ test-cycle issue type not found in project")
-                return None
-            
-            payload = {
-                "fields": {
-                    "project": {"key": self.settings.xray_project_key},
-                    "summary": cycle_name,
-                    "issuetype": {"id": issue_type_id},
-                    "description": {
-                        "version": 1,
-                        "type": "doc",
-                        "content": [
-                            {
-                                "type": "paragraph",
-                                "content": [
-                                    {
-                                        "type": "text",
-                                        "text": f"Test Cycle: {cycle_name}",
-                                        "marks": [{"type": "strong"}]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "paragraph",
-                                "content": [{"type": "text", "text": f"Parent Test Plan: {test_plan_key}"}]
-                            },
-                            {
-                                "type": "paragraph",
-                                "content": [{"type": "text", "text": "Contains individual tests and their execution results."}]
-                            }
-                        ]
-                    },
-                    "labels": ["test-cycle", "automated"]
-                }
-            }
-            
-            response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
-            if response.status_code == 201:
-                test_cycle_key = response.json()["key"]
-                print(f"✅ Created test cycle: {test_cycle_key}")
-                
-                # Link test cycle to test plan
-                self.link_to_parent(test_cycle_key, test_plan_key)
-                return test_cycle_key
-            else:
-                error_detail = response.json() if response.headers.get('content-type') == 'application/json' else response.text
-                print(f"❌ Failed to create test cycle: {response.status_code} - {error_detail}")
-                return None
-        except Exception as e:
-            print(f"❌ Error creating test cycle: {e}")
-            return None
-
     def import_execution_to_xray(self, payload: dict) -> Dict[str, Any]:
         """Import execution results to Xray"""
         # Determine if we are on Cloud or Server/DC
@@ -421,11 +263,15 @@ class JiraXrayClient:
             if response.status_code == 201:
                 print(f"✓ Linked {test_key} to {parent_key}")
                 return True
+            elif response.status_code == 404:
+                # Parent issue doesn't exist - log but don't fail
+                print(f"⚠️ Parent issue {parent_key} not found in Jira (404). Skipping link.")
+                return False
             else:
-                print(f"✗ Failed to link {test_key} to {parent_key}: {response.status_code}")
+                print(f"⚠️ Failed to link {test_key} to {parent_key}: {response.status_code}")
                 return False
         except Exception as e:
-            print(f"✗ Error linking {test_key} to {parent_key}: {str(e)}")
+            print(f"⚠️ Error linking {test_key} to {parent_key}: {str(e)}")
             return False
 
     def link_test_to_execution(self, execution_key: str, test_key: str) -> bool:

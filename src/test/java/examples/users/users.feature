@@ -5,7 +5,7 @@ Feature: API de Usuarios - Testing Completo
     * url baseUrl
     * header Accept = 'application/json'
 
-  @smoke @get @regression @SCRUM-12
+  @smoke @get
   Scenario: Obtener lista de usuarios
     Given path '/users'
     When method GET
@@ -14,7 +14,7 @@ Feature: API de Usuarios - Testing Completo
     And match response[0] contains { id: '#number', name: '#string', email: '#string' }
     And match each response contains { id: '#number', name: '#string', username: '#string', email: '#string' }
 
-  @smoke @get @regression @SCRUM-12
+  @smoke @get
   Scenario: Obtener un usuario específico por ID
     Given path '/users/1'
     When method GET
@@ -50,7 +50,7 @@ Feature: API de Usuarios - Testing Completo
       }
       """
 
-  @smoke @post @regression @SCRUM-12
+  @smoke @post
   Scenario: Crear un nuevo usuario
     Given path '/users'
     And request

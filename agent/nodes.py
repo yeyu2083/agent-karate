@@ -134,44 +134,27 @@ def map_to_xray_node(state: AgentState) -> AgentState:
     settings = JiraXraySettings()
     client = JiraXrayClient(settings)
     
-    # Get parent issue key and context from environment
+    # Get parent issue key from environment (extracted from branch name)
     parent_issue_key = os.getenv("JIRA_PARENT_ISSUE", "").strip()
-    cycle_type = os.getenv("CYCLE_TYPE", "FEATURE").strip()
-    build_number = os.getenv("BUILD_NUMBER", "1").strip()
     
     try:
-        # Orchestrate Test Plan -> Test Cycle -> Tests hierarchy
-        test_plan_key = None
-        test_cycle_key = None
+        print(f"\n📋 Map to Xray Node")
+        print(f"   Parent Issue: {parent_issue_key or 'NONE'}")
         
-        if parent_issue_key:
-            # Create or find test plan for this US
-            test_plan_key = client.find_or_create_test_plan(parent_issue_key)
-            print(f"✅ Test Plan: {test_plan_key}")
-            
-            if test_plan_key:
-                # Create test cycle under the test plan
-                cycle_name = f"{cycle_type} Cycle #{build_number} - {parent_issue_key}"
-                test_cycle_key = client.create_test_cycle(test_plan_key, cycle_name)
-                print(f"✅ Test Cycle: {test_cycle_key}")
-        
-        # Create individual test issues and link to cycle
+        # Create individual test issues and link to parent
         tests = []
+        test_keys = []
+        
         for result in state.get('karate_results', []):
             test_key = client.get_or_create_test_issue(
                 result.feature, 
                 result.scenario, 
-                parent_issue_key,
-                steps=result.steps  # Pasamos los pasos detallados
+                parent_issue_key if parent_issue_key else None,
+                steps=result.steps
             )
             
             if test_key:
-                # Link test to test cycle if available, otherwise to parent issue
-                if test_cycle_key:
-                    client.link_to_parent(test_key, test_cycle_key)
-                    print(f"🔗 Test {test_key} linked to Cycle {test_cycle_key}")
-                
-                # Build test record for Xray payload
+                test_keys.append(test_key)
                 tests.append({
                     "testKey": test_key,
                     "status": "PASS" if result.status == "passed" else "FAIL",
@@ -179,29 +162,29 @@ def map_to_xray_node(state: AgentState) -> AgentState:
                     "start": str(int(result.duration * 1000))
                 })
         
-        # Prepare Xray import payload
-        payload = {}
-        if test_cycle_key:
-            payload["testCycleKey"] = test_cycle_key
-        elif test_plan_key:
-            payload["testPlanKey"] = test_plan_key
-        else:
-            payload["testExecutionKey"] = None
-        
-        payload["tests"] = tests
+        # Prepare payload for Xray (simple format)
+        payload = {
+            "tests": tests
+        }
         
         state["xray_import_payload"] = payload
         state["current_step"] = "mapped_to_xray"
         state["parent_issue"] = parent_issue_key or "None"
-        state["test_execution"] = test_cycle_key or test_plan_key or "None"
+        state["test_execution"] = f"{len(test_keys)} tests created"
         
-        # TRANSICIONAR HISTORIA DE USUARIO (US) SI TODOS LOS TESTS PASAN
-        if parent_issue_key and all(r.status == "passed" for r in state.get('karate_results', [])):
-            print(f"🌟 All tests passed! Attempting to move US {parent_issue_key} to 'Done'...")
-            # Intenta estados comunes de terminación
-            if not client.transition_issue(parent_issue_key, "Done"):
-                if not client.transition_issue(parent_issue_key, "Finalizado"):
-                    client.transition_issue(parent_issue_key, "Tested")
+        print(f"   ✅ Created {len(test_keys)} test issues: {', '.join(test_keys)}")
+        
+        # TRANSICIONAR HISTORIA DE USUARIO SI TODOS LOS TESTS PASAN
+        if parent_issue_key:
+            all_passed = all(r.status == "passed" for r in state.get('karate_results', []))
+            if all_passed:
+                print(f"\n🌟 All tests passed! Transitioning {parent_issue_key} to Done...")
+                if not client.transition_issue(parent_issue_key, "Done"):
+                    if not client.transition_issue(parent_issue_key, "Finalizado"):
+                        client.transition_issue(parent_issue_key, "Tested")
+            else:
+                failed_count = sum(1 for r in state.get('karate_results', []) if r.status != "passed")
+                print(f"⚠️ {failed_count} test(s) failed. Not transitioning {parent_issue_key}.")
 
     except Exception as e:
         print(f"❌ Error mapping to Xray: {e}")

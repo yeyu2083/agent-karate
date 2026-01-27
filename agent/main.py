@@ -18,11 +18,14 @@ load_dotenv()
 
 def find_karate_results() -> str:
     """Find karate results file"""
+    # Get the project root (parent of agent/)
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    
     paths = [
-        "../karate.json",
-        "../target/karate-reports/karate-summary.json",
-        "../target/karate-reports/karate.json",
-        "../src/test/java/target/karate-reports/karate.json",
+        os.path.join(project_root, "karate.json"),
+        os.path.join(project_root, "target/karate-reports/karate-summary.json"),
+        os.path.join(project_root, "target/karate-reports/karate.json"),
+        os.path.join(project_root, "src/test/java/target/karate-reports/karate.json"),
     ]
     
     for path in paths:
@@ -30,7 +33,7 @@ def find_karate_results() -> str:
             print(f"✓ Found Karate results: {path}")
             return path
     
-    print("❌ No Karate results file found")
+    print(f"❌ No Karate results file found (searched in {project_root})")
     return None
 
 def main():

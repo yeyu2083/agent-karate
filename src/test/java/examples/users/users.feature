@@ -68,3 +68,7 @@ Feature: API de Usuarios - Testing Completo
     And match response.username == 'testuser'
 
   @smoke @negative @regression @SCRUM-12
+  Scenario: Obtener usuario con ID inválido
+    Given path '/users/99999'
+    When method GET
+    Then status 404

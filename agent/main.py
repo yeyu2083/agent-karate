@@ -7,11 +7,11 @@ Loads Karate results and syncs to TestRail
 import os
 import sys
 from dotenv import load_dotenv
-from .state import AgentState, TestResult
-from .karate_parser import KarateParser
-from .testrail_client import TestRailClient, TestRailSettings
-from .testrail_sync import TestRailSync
-from .testrail_runner import TestRailRunner
+from state import AgentState, TestResult
+from karate_parser import KarateParser
+from testrail_client import TestRailClient, TestRailSettings
+from testrail_sync import TestRailSync
+from testrail_runner import TestRailRunner
 
 # Load environment
 load_dotenv()

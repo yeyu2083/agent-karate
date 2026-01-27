@@ -18,3 +18,6 @@ class AgentState(TypedDict):
     jira_response: Optional[dict]
     final_output: str
     current_step: str
+    parent_issue: Optional[str]
+    test_plan: Optional[str]
+    test_execution: Optional[str]

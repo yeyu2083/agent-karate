@@ -138,10 +138,21 @@ def map_to_xray_node(state: AgentState) -> AgentState:
     parent_issue_key = os.getenv("JIRA_PARENT_ISSUE", "").strip()
     
     try:
-        print(f"\n📋 Map to Xray Node")
-        print(f"   Parent Issue: {parent_issue_key or 'NONE'}")
+        print(f"\n🏗️ Building X-Ray Test Hierarchy")
+        if parent_issue_key:
+            print(f"   Parent US: {parent_issue_key}")
         
-        # Create individual test issues and link to parent
+        # STEP 1: Create Test Plan (if we have a parent)
+        test_plan_key = None
+        if parent_issue_key:
+            test_plan_key = client.create_test_plan(f"Test Plan for {parent_issue_key}")
+            if test_plan_key:
+                print(f"   ✅ Created Test Plan: {test_plan_key}")
+                # Link Test Plan to parent US
+                client.link_test_plan_to_parent(test_plan_key, parent_issue_key)
+        
+        # STEP 2: Create individual test issues
+        print(f"\n📋 Creating Test Issues")
         tests = []
         test_keys = []
         
@@ -149,7 +160,7 @@ def map_to_xray_node(state: AgentState) -> AgentState:
             test_key = client.get_or_create_test_issue(
                 result.feature, 
                 result.scenario, 
-                parent_issue_key if parent_issue_key else None,
+                None,
                 steps=result.steps
             )
             
@@ -162,19 +173,62 @@ def map_to_xray_node(state: AgentState) -> AgentState:
                     "start": str(int(result.duration * 1000))
                 })
         
-        # Prepare payload for Xray (simple format)
+        print(f"   ✅ Created {len(test_keys)} test issues: {', '.join(test_keys)}")
+        
+        # STEP 3: Create Test Execution container
+        test_execution_key = None
+        if parent_issue_key or test_plan_key:
+            test_execution_key = client.create_test_execution(parent_issue_key, test_plan_key)
+            if test_execution_key:
+                print(f"   ✅ Created Test Execution: {test_execution_key}")
+                
+                # Link all tests to the test execution container
+                for test_key in test_keys:
+                    client.link_test_to_execution(test_execution_key, test_key)
+                
+                # STEP 4: Link Test Execution to parent issue (US)
+                if parent_issue_key:
+                    client.link_test_execution_to_parent(test_execution_key, parent_issue_key)
+                
+                # STEP 5: Link Test Execution to Test Plan
+                if test_plan_key:
+                    client.link_execution_to_test_plan(test_execution_key, test_plan_key)
+        
+        # Prepare payload
         payload = {
-            "tests": tests
+            "tests": tests,
+            "parent_issue": parent_issue_key or "None",
+            "test_plan": test_plan_key or "None",
+            "test_execution": test_execution_key or "None"
         }
         
         state["xray_import_payload"] = payload
         state["current_step"] = "mapped_to_xray"
         state["parent_issue"] = parent_issue_key or "None"
-        state["test_execution"] = f"{len(test_keys)} tests created"
+        state["test_execution"] = test_execution_key or "None"
         
-        print(f"   ✅ Created {len(test_keys)} test issues: {', '.join(test_keys)}")
+        # Print hierarchy
+        print(f"\n✅ Test Hierarchy Structure:")
+        if parent_issue_key:
+            print(f"   {parent_issue_key} (US/Historia)")
+            if test_plan_key:
+                print(f"   ├─ is tested by: {test_plan_key} (Test Plan)")
+            if test_execution_key:
+                print(f"   ├─ is tested by: {test_execution_key} (Test Execution)")
+                for test_key in test_keys:
+                    print(f"   │  ├─ {test_key} (Test)")
+                if test_plan_key:
+                    print(f"   └─ {test_plan_key} (Test Plan)")
+                    print(f"      ├─ contains: {test_execution_key} (Test Execution)")
+                    for test_key in test_keys:
+                        print(f"      │  ├─ {test_key} (Test)")
+        else:
+            if test_execution_key:
+                print(f"   {test_execution_key} (Test Execution)")
+                for test_key in test_keys:
+                    print(f"   ├─ {test_key} (Test)")
         
-        # TRANSICIONAR HISTORIA DE USUARIO SI TODOS LOS TESTS PASAN
+        # STEP 6: Transition Historia de Usuario if all tests pass
         if parent_issue_key:
             all_passed = all(r.status == "passed" for r in state.get('karate_results', []))
             if all_passed:
@@ -187,8 +241,8 @@ def map_to_xray_node(state: AgentState) -> AgentState:
                 print(f"⚠️ {failed_count} test(s) failed. Not transitioning {parent_issue_key}.")
 
     except Exception as e:
-        print(f"❌ Error mapping to Xray: {e}")
-        state["current_step"] = "xray_mapping_error"
+        print(f"❌ Error creating tests: {e}")
+        state["current_step"] = "test_creation_error"
         state["error_message"] = str(e)
     
     return state

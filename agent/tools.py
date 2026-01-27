@@ -210,10 +210,6 @@ class JiraXrayClient:
                     created_key = response.json()["key"]
                     print(f"✓ Created {issue_type_name} issue: {created_key}")
                     
-                    # Vincular al parent si existe
-                    if parent_key:
-                        self.link_to_parent(created_key, parent_key)
-                    
                     return created_key
                 else:
 
@@ -225,45 +221,8 @@ class JiraXrayClient:
         return test_key
         
     def link_to_parent(self, test_key: str, parent_key: str) -> bool:
-        """Link a test issue to a parent issue (Epic, Story, Task, etc.)"""
-        try:
-            url = f"{self.settings.jira_base_url}/rest/api/3/issue/{parent_key}/link"
-            
-            # The parent issue receives the link FROM the test
-            # So: PARENT "is tested by" TEST
-            payload = {
-                "inwardIssue": {"key": test_key},
-                "type": {"name": "is tested by"}
-            }
-            response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
-            
-            if response.status_code == 201:
-                print(f"✓ Linked: {parent_key} is tested by {test_key}")
-                return True
-            elif response.status_code == 404:
-                print(f"⚠️ Parent issue {parent_key} not found. Skipping link.")
-                return False
-            else:
-                # Fallback: try alternative link types
-                print(f"⚠️ Link type 'is tested by' failed ({response.status_code}). Trying 'relates to'...")
-                
-                url = f"{self.settings.jira_base_url}/rest/api/3/issue/{test_key}/link"
-                payload = {
-                    "outwardIssue": {"key": parent_key},
-                    "type": {"name": "relates to"}
-                }
-                response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
-                
-                if response.status_code == 201:
-                    print(f"✓ Linked {test_key} relates to {parent_key}")
-                    return True
-                else:
-                    print(f"⚠️ Failed to link {test_key} to {parent_key}")
-                    return False
-            
-        except Exception as e:
-            print(f"⚠️ Error linking {test_key} to {parent_key}: {str(e)}")
-            return False
+        """Deprecated: not used anymore. Tests are created independently."""
+        return False
 
     def link_test_to_execution(self, execution_key: str, test_key: str) -> bool:
         """Link a Test to a Test Execution issue (proper Xray link)"""
@@ -282,6 +241,46 @@ class JiraXrayClient:
                 return False
         except Exception as e:
             print(f"❌ Error linking test to execution: {e}")
+            return False
+
+    def link_test_execution_to_parent(self, execution_key: str, parent_key: str) -> bool:
+        """Link Test Execution to parent issue (US/Story)"""
+        try:
+            url = f"{self.settings.jira_base_url}/rest/api/3/issue/{parent_key}/link"
+            
+            # Try: PARENT "is tested by" EXECUTION
+            payload = {
+                "inwardIssue": {"key": execution_key},
+                "type": {"name": "is tested by"}
+            }
+            response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
+            
+            if response.status_code == 201:
+                print(f"✓ {parent_key} is tested by {execution_key}")
+                return True
+            elif response.status_code == 404:
+                print(f"⚠️ Parent issue {parent_key} not found. Skipping link.")
+                return False
+            else:
+                # Fallback to "relates to"
+                payload = {
+                    "outwardIssue": {"key": parent_key},
+                    "type": {"name": "relates to"}
+                }
+                response = requests.post(
+                    f"{self.settings.jira_base_url}/rest/api/3/issue/{execution_key}/link",
+                    headers=self.headers,
+                    auth=self.auth,
+                    json=payload
+                )
+                if response.status_code == 201:
+                    print(f"✓ {execution_key} relates to {parent_key}")
+                    return True
+                else:
+                    print(f"⚠️ Could not link {execution_key} to {parent_key}")
+                    return False
+        except Exception as e:
+            print(f"❌ Error linking execution to parent: {e}")
             return False
 
     def link_issues(self, source_key: str, target_key: str, link_name: str = "Relates") -> bool:
@@ -346,7 +345,64 @@ class JiraXrayClient:
             print(f"❌ Error transitioning issue: {e}")
             return False
 
-    def create_test_execution(self, parent_key: Optional[str] = None) -> Optional[str]:
+    def create_test_plan(self, summary: str = "Automated Test Plan") -> Optional[str]:
+        """Create a Test Plan container in Xray"""
+        from datetime import datetime
+        
+        url = f"{self.settings.jira_base_url}/rest/api/3/issue"
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        
+        # Test Plan names to try
+        plan_types = ["Test Plan", "Plan de Pruebas", "Epic"]
+        issue_type_id = None
+        used_type = None
+        
+        for pt in plan_types:
+            issue_type_id = self.get_issue_type_id(pt)
+            if issue_type_id:
+                used_type = pt
+                print(f"Using issue type for Test Plan: {pt} ({issue_type_id})")
+                break
+        
+        if not issue_type_id:
+            print("⚠️ Could not find suitable issue type for Test Plan.")
+            return None
+        
+        payload = {
+            "fields": {
+                "project": {"key": self.settings.xray_project_key},
+                "summary": f"{summary} - {timestamp}",
+                "issuetype": {"id": issue_type_id},
+                "description": {
+                    "version": 1,
+                    "type": "doc",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "Test Plan for automated Karate test execution",
+                                    "marks": [{"type": "strong"}]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "labels": ["test-plan", "automated", "karate"]
+            }
+        }
+        
+        response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
+        if response.status_code == 201:
+            plan_key = response.json()["key"]
+            print(f"✓ Created Test Plan: {plan_key}")
+            return plan_key
+        else:
+            print(f"✗ Failed to create Test Plan: {response.status_code}")
+            return None
+
+    def create_test_execution(self, parent_key: Optional[str] = None, test_plan_key: Optional[str] = None) -> Optional[str]:
         """Create a Test Execution issue in Xray for tracking test runs"""
         from datetime import datetime
         
@@ -385,7 +441,8 @@ class JiraXrayClient:
                             "content": [
                                 {
                                     "type": "text",
-                                    "text": "Automated test execution from Karate"
+                                    "text": "Automated test execution from Karate",
+                                    "marks": [{"type": "strong"}]
                                 }
                             ]
                         },
@@ -394,7 +451,16 @@ class JiraXrayClient:
                             "content": [
                                 {
                                     "type": "text",
-                                    "text": f"Parent: {parent_key or 'N/A'}"
+                                    "text": f"Parent US: {parent_key or 'N/A'}"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": f"Test Plan: {test_plan_key or 'N/A'}"
                                 }
                             ]
                         }
@@ -409,11 +475,87 @@ class JiraXrayClient:
             exec_key = response.json()["key"]
             print(f"✓ Created Test Execution: {exec_key}")
             
-            # Vincular al parent si existe
-            if parent_key:
-                self.link_to_parent(exec_key, parent_key)
-            
             return exec_key
         else:
             print(f"✗ Failed to create Test Execution: {response.status_code}")
             return None
+    
+    def link_test_plan_to_parent(self, test_plan_key: str, parent_key: str) -> bool:
+        """Link Test Plan to parent issue (US/Story)"""
+        try:
+            url = f"{self.settings.jira_base_url}/rest/api/3/issue/{parent_key}/link"
+            
+            # Try: PARENT "is tested by" TEST PLAN
+            payload = {
+                "inwardIssue": {"key": test_plan_key},
+                "type": {"name": "is tested by"}
+            }
+            response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
+            
+            if response.status_code == 201:
+                print(f"✓ {parent_key} is tested by {test_plan_key}")
+                return True
+            elif response.status_code == 404:
+                print(f"⚠️ Parent issue {parent_key} not found. Skipping link.")
+                return False
+            else:
+                # Fallback to "relates to"
+                payload = {
+                    "outwardIssue": {"key": parent_key},
+                    "type": {"name": "relates to"}
+                }
+                response = requests.post(
+                    f"{self.settings.jira_base_url}/rest/api/3/issue/{test_plan_key}/link",
+                    headers=self.headers,
+                    auth=self.auth,
+                    json=payload
+                )
+                if response.status_code == 201:
+                    print(f"✓ {test_plan_key} relates to {parent_key}")
+                    return True
+                else:
+                    print(f"⚠️ Could not link {test_plan_key} to {parent_key}")
+                    return False
+        except Exception as e:
+            print(f"❌ Error linking test plan to parent: {e}")
+            return False
+
+    def link_execution_to_test_plan(self, execution_key: str, test_plan_key: str) -> bool:
+        """Link Test Execution to Test Plan"""
+        try:
+            url = f"{self.settings.jira_base_url}/rest/api/3/issue/{test_plan_key}/link"
+            
+            # Test Plan "contains" or "is related to" Test Execution
+            payload = {
+                "inwardIssue": {"key": execution_key},
+                "type": {"name": "contains"}
+            }
+            response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
+            
+            if response.status_code == 201:
+                print(f"✓ {test_plan_key} contains {execution_key}")
+                return True
+            elif response.status_code == 404:
+                print(f"⚠️ Test Plan {test_plan_key} not found.")
+                return False
+            else:
+                # Fallback to "relates to"
+                payload = {
+                    "outwardIssue": {"key": test_plan_key},
+                    "type": {"name": "relates to"}
+                }
+                response = requests.post(
+                    f"{self.settings.jira_base_url}/rest/api/3/issue/{execution_key}/link",
+                    headers=self.headers,
+                    auth=self.auth,
+                    json=payload
+                )
+                if response.status_code == 201:
+                    print(f"✓ {execution_key} relates to {test_plan_key}")
+                    return True
+                else:
+                    print(f"⚠️ Could not link {execution_key} to {test_plan_key}")
+                    return False
+        except Exception as e:
+            print(f"❌ Error linking execution to test plan: {e}")
+            return False

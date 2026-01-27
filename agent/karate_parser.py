@@ -134,12 +134,21 @@ class KarateParser:
                 for step in steps:
                     if isinstance(step, dict):
                         result = step.get('result', {})
+                        
+                        # Extraer DocStrings (ej. payloads JSON, XML)
+                        doc_string_data = None
+                        if 'doc_string' in step:
+                             doc_s = step['doc_string']
+                             if isinstance(doc_s, dict):
+                                 doc_string_data = doc_s.get('value')
+                        
                         step_info = {
                             "keyword": step.get('keyword', ''),
                             "text": step.get('name', ''),
                             "status": result.get('status', 'unknown'),
                             "duration_ms": result.get('duration', 0) / 1e6, # nanoseconds to milliseconds
-                            "error": result.get('error_message', None)
+                            "error": result.get('error_message', None),
+                            "data": doc_string_data
                         }
                         steps_data.append(step_info)
             else:

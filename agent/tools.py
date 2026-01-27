@@ -178,11 +178,26 @@ class JiraXrayClient:
                 # Crear tabla manual para pasos en formato ADF de Jira
                 # Nota: Las tablas ADF son complejas de construir manualmente sin librerías.
                 # Usaremos CodeBlock para logs formateados que es más seguro y legible.
-                steps_text = "Keyword | Step Name | Status | Duration (ms)\n"
-                steps_text += "--- | --- | --- | ---\n"
+                steps_text = "Keyword | Step Name | Data | Status | Duration (ms)\n"
+                steps_text += "--- | --- | --- | --- | ---\n"
                 for step in steps:
                     status_icon = "✅" if step.get('status') == 'passed' else "❌"
-                    steps_text += f"{step.get('keyword')} | {step.get('text')} | {status_icon} {step.get('status')} | {step.get('duration_ms'):.2f}\n"
+                    
+                    # Previsualización de data (si existe)
+                    data_preview = ""
+                    if step.get('data'):
+                         data_val = str(step.get('data')).replace('\n', ' ')
+                         # Trucar si es muy largo para la tabla
+                         data_preview = (data_val[:30] + '...') if len(data_val) > 30 else data_val
+
+                    steps_text += f"{step.get('keyword')} | {step.get('text')} | {data_preview} | {status_icon} {step.get('status')} | {step.get('duration_ms'):.2f}\n"
+                    
+                    # Mostrar data completa debajo del paso
+                    if step.get('data'):
+                        steps_lines = str(step.get('data')).split('\n')
+                        for line in steps_lines:
+                             steps_text += f"> Data: {line}\n"
+
                     if step.get('error'):
                          steps_text += f"> Error: {step.get('error')}\n"
                 

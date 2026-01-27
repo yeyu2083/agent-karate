@@ -4,7 +4,7 @@ Feature: Autenticación y Autorización
   Background:
     * url apiUrl
 
-  @smoke @auth
+  @smoke @auth @regression @SCRUM-4
   Scenario: Login exitoso y obtención de token
     Given path '/login'
     And request
@@ -21,7 +21,7 @@ Feature: Autenticación y Autorización
     # Guardar el token para uso posterior
     * def authToken = response.token
 
-  @smoke @auth @negative
+  @smoke @auth @negative @regression @SCRUM-4
   Scenario: Login fallido - credenciales incorrectas
     Given path '/login'
     And request

@@ -51,6 +51,28 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Detect Context (REGRESSION vs FEATURE)
+        id: detect_context
+        run: |
+          BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
+          echo "Branch: $BRANCH_NAME"
+          
+          # Determine cycle type based on branch
+          if [ "$BRANCH_NAME" = "main" ] || [ "$BRANCH_NAME" = "master" ]; then
+            CYCLE_TYPE="REGRESSION"
+          else
+            CYCLE_TYPE="FEATURE"
+          fi
+          
+          echo "cycle_type=$CYCLE_TYPE" >> $GITHUB_OUTPUT
+          echo "Cycle Type: $CYCLE_TYPE"
+          
+          # Calculate BUILD_NUMBER from github.run_number
+          BUILD_NUMBER="${{ github.run_number }}"
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "Build Number: $BUILD_NUMBER"
+      
       - name: Extract Jira Issue Key from Branch
         id: extract_jira
         run: |
@@ -63,25 +85,24 @@ jobs:
           else
             echo "Jira issue key detected: $ISSUE_KEY"
           fi
+      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
+      
       - name: Download Karate results
         uses: actions/download-artifact@v4
         with:
           name: karate-results
           path: ./
+      
       - name: Install Python dependencies
         run: |
           cd agent
           pip install -r requirements.txt
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
+      
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -107,6 +128,10 @@ jobs:
         env:
           JAVA_VERSION: 17
           MAVEN_OPTS: -Xmx3072m
+          CYCLE_TYPE: ${{ steps.detect_context.outputs.cycle_type }}
+          BUILD_NUMBER: ${{ steps.detect_context.outputs.build_number }}
+          JIRA_PARENT_ISSUE: ${{ steps.extract_jira.outputs.issue_key }}
+      
       - name: Upload Agent Logs
         if: always()
         uses: actions/upload-artifact@v4

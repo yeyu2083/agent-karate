@@ -89,12 +89,7 @@ class TestRailSync:
         """Build TestRail case payload from TestResult"""
         return {
             'title': f"{result.feature} - {result.scenario}",
-            'type_id': 1,  # Test
-            'priority_id': self._infer_priority(result),
-            'estimate': '5m',
             'custom_automation_id': automation_id,
-            'custom_automation_type': 'Automated',
-            'custom_test_type': 'API',
         }
     
     def _infer_priority(self, result: TestResult) -> int:

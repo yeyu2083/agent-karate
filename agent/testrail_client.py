@@ -146,6 +146,8 @@ class TestRailClient:
         """POST /add_case/{section_id}"""
         url = f"{self.base_url}/add_case/{section_id}"
         try:
+            print(f"   DEBUG: Sending to {url}")
+            print(f"   DEBUG: Payload = {case_data}")
             response = requests.post(
                 url,
                 auth=self.auth,
@@ -156,6 +158,8 @@ class TestRailClient:
             return response.json()
         except Exception as e:
             print(f"❌ Error adding case: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"   Response body: {e.response.text}")
             return None
     
     def update_case(self, case_id: int, case_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:

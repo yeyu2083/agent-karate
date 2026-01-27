@@ -140,6 +140,7 @@ def map_to_xray_node(state: AgentState) -> AgentState:
     try:
         # Crear Test Execution
         test_execution_key = client.create_test_execution(parent_issue_key)
+        print(f"\n✅ Test Execution creado: {test_execution_key}")
         
         tests = []
         for result in state.get('karate_results', []):
@@ -152,7 +153,8 @@ def map_to_xray_node(state: AgentState) -> AgentState:
             
             # Agregamos los tests a la ejecución creada (Vinculando Issues)
             if test_execution_key and test_key:
-                 client.link_issues(test_execution_key, test_key, link_name="contains") # O un enlace genérico
+                 print(f"🔗 Vinculando {test_key} -> {test_execution_key}")
+                 client.link_test_to_execution(test_execution_key, test_key)
                  client.add_comment(test_execution_key, f"Test {test_key} result: {result.status.upper()}")
 
             if test_key:

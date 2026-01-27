@@ -270,6 +270,25 @@ class JiraXrayClient:
             print(f"✗ Error linking {test_key} to {parent_key}: {str(e)}")
             return False
 
+    def link_test_to_execution(self, execution_key: str, test_key: str) -> bool:
+        """Link a Test to a Test Execution issue (proper Xray link)"""
+        try:
+            url = f"{self.settings.jira_base_url}/rest/api/3/issue/{test_key}/link"
+            payload = {
+                "outwardIssue": {"key": execution_key},
+                "type": {"name": "is executed by"}
+            }
+            response = requests.post(url, headers=self.headers, auth=self.auth, json=payload)
+            if response.status_code == 201:
+                print(f"✓ Test {test_key} linked to Execution {execution_key}")
+                return True
+            else:
+                print(f"⚠️ Failed to link {test_key} to {execution_key}: {response.status_code}")
+                return False
+        except Exception as e:
+            print(f"❌ Error linking test to execution: {e}")
+            return False
+
     def link_issues(self, source_key: str, target_key: str, link_name: str = "Relates") -> bool:
         """Generic link between two issues"""
         # Note: Xray uses normal issue links for Test Executions -> Tests in simple mode

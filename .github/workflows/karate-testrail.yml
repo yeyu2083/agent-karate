@@ -145,9 +145,7 @@ jobs:
           ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
         run: |
           echo "🚀 Invoking TestRail sync agent..."
-          cd agent
-          python main.py 2>&1 | tee ../testrail-output.log
-          cd ..
+          python -m agent.main 2>&1 | tee testrail-output.log
           
           # Extract run_id if exists
           RUN_ID=$(grep -oP "Run: #\K[0-9]+" testrail-output.log | tail -1 || echo "unknown")

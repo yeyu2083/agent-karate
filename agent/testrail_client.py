@@ -96,10 +96,15 @@ class TestRailClient:
             )
             response.raise_for_status()
             data = response.json()
+            print(f"   DEBUG: get_sections raw response type = {type(data)}")
+            print(f"   DEBUG: get_sections raw response = {data}")
             # TestRail returns a dict with numeric keys, convert to list
             if isinstance(data, dict):
-                return list(data.values())
-            return data if isinstance(data, list) else []
+                result = list(data.values())
+            else:
+                result = data if isinstance(data, list) else []
+            print(f"   DEBUG: get_sections after conversion = {result}")
+            return result
         except Exception as e:
             print(f"❌ Error getting sections: {e}")
             return []

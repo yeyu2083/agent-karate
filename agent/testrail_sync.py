@@ -30,6 +30,9 @@ class TestRailSync:
         case_map = {}
         sections = self._get_sections()
         
+        print(f"   DEBUG: sections type = {type(sections)}")
+        print(f"   DEBUG: sections = {sections}")
+        
         if not sections:
             print("⚠️ No sections found. Creating cases in suite root.")
             section_id = None

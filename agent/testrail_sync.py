@@ -86,11 +86,83 @@ class TestRailSync:
             return None
     
     def _build_case_data(self, result: TestResult, automation_id: str) -> dict:
-        """Build TestRail case payload from TestResult"""
+        """Build TestRail case payload from TestResult with formatted description"""
+        priority = self._infer_priority(result)
+        description = self._build_formatted_description(result)
+        
         return {
-            'title': f"{result.feature} - {result.scenario}",
+            'title': result.scenario,
             'custom_automation_id': automation_id,
+            'description': description,
+            'priority_id': priority,
+            'custom_feature': result.feature,
+            'custom_is_automated': 1,  # Marcar como automatizado
+            'estimate': None,  # Se calcula automáticamente
         }
+    
+    def _build_formatted_description(self, result: TestResult) -> str:
+        """
+        Build an HTML-formatted description for TestRail
+        Includes feature, steps, execution status and automation info
+        """
+        
+        # Status badge
+        status_badge = self._get_status_badge(result.status)
+        execution_time = f"⏱️ {result.duration:.2f}s" if result.duration else "⏱️ N/A"
+        
+        description_html = f"""
+<div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+<h3>📋 Feature: <strong>{result.feature}</strong></h3>
+<p style="margin: 5px 0;"><strong>Automation Status:</strong> {status_badge} | {execution_time}</p>
+</div>
+
+<h4>📝 Test Steps:</h4>
+<ul style="font-family: monospace; background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin: 10px 0;">
+"""
+        
+        # Add steps
+        if result.steps:
+            for i, step in enumerate(result.steps, 1):
+                step_text = step.get('text', 'N/A') if isinstance(step, dict) else str(step)
+                step_keyword = step.get('keyword', '•') if isinstance(step, dict) else '•'
+                description_html += f'<li><strong>{step_keyword}</strong> {step_text}</li>\n'
+        else:
+            description_html += '<li>• No steps recorded</li>\n'
+        
+        description_html += """</ul>
+
+<h4>📊 Expected Result:</h4>
+<p style="background-color: #e8f5e9; padding: 10px; border-left: 4px solid #4caf50; border-radius: 3px; margin: 10px 0;">
+Test should pass without errors. Response status and assertions must match expected values.
+</p>
+"""
+        
+        # Add error if failed
+        if result.status == 'failed' and result.error_message:
+            description_html += f"""
+<h4>❌ Failure Details:</h4>
+<p style="background-color: #ffebee; padding: 10px; border-left: 4px solid #f44336; border-radius: 3px; margin: 10px 0;">
+<code>{result.error_message}</code>
+</p>
+"""
+        
+        description_html += """
+<h4>⚙️ Automation Info:</h4>
+<p style="margin: 10px 0;">
+<code>type: karate</code> | <code>framework: karate-dsl</code> | <code>automated: yes</code>
+</p>
+"""
+        
+        return description_html
+    
+    def _get_status_badge(self, status: str) -> str:
+        """Generate HTML badge for status"""
+        if status == 'passed':
+            return '<span style="background-color: #4caf50; color: white; padding: 2px 8px; border-radius: 3px;">✅ PASSED</span>'
+        elif status == 'failed':
+            return '<span style="background-color: #f44336; color: white; padding: 2px 8px; border-radius: 3px;">❌ FAILED</span>'
+        else:
+            return '<span style="background-color: #ff9800; color: white; padding: 2px 8px; border-radius: 3px;">⚠️ UNKNOWN</span>'
     
     def _infer_priority(self, result: TestResult) -> int:
         """

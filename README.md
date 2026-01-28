@@ -419,6 +419,61 @@ Cada test sincronizado incluye:
 | Test cases no se sincronizan | Revisar logs del workflow en GitHub Actions |
 | Payload error 400 | Verificar que project_id y suite_id sean correctos |
 
+---
+
+## 📋 Actualización: Formato Automatizado en TestRail (Enero 2026)
+
+### ✅ Cambios Implementados
+
+**Scenario Outline con Tablas:**
+- ✅ `auth.feature` → Login con 3 casos (1 positivo + 2 negativos)
+- ✅ `posts.feature` → Get y Create con 8+ casos parametrizados
+
+**Descripción HTML Automática:**
+- 📋 Feature claramente identificada
+- 📝 Steps organizados en lista formateada
+- ✅/❌ Status real (PASSED/FAILED) en badge con colores
+- ⏱️ Tiempo de ejecución
+- ❌ Detalles de error (si falló)
+- 🤖 Marcado como automatizado
+
+**Prioridades Auto-Inferidas:**
+- 🔴 Critical (5): detecta "critical", "smoke", "main"
+- 🟡 Low (2): detecta "negative", "error"
+- 🟢 Medium (3): resto
+
+**Ejemplo en TestRail:**
+```
+Case C38: Validación de login con diferentes credenciales
+Status: ✅ PASSED | ⏱️ 1.23s
+Automated: YES
+Priority: MEDIUM
+
+Description:
+📋 Feature: Autenticación y Autorización
+Status: ✅ PASSED | ⏱️ 1.23s
+
+📝 Test Steps:
+  • Given path '/login'
+  • When method POST
+  • Then status 200
+
+⚙️ Automation Info:
+type: karate | framework: karate-dsl | automated: yes
+```
+
+### 🚀 Para Ejecutar
+
+```bash
+# 1. Ejecutar tests
+mvn test -Dtest=TestRunner
+
+# 2. Sincronizar con TestRail
+python agent/main.py
+```
+
+Resultado: Todos los casos sincronizados con status real, HTML formateado y marcados como automatizados.
+
 ### 📚 Variables de Entorno Usadas por el Workflow
 
 ```

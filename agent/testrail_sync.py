@@ -119,35 +119,36 @@ class TestRailSync:
     
     def _build_formatted_description(self, result: TestResult) -> str:
         """
-        Build a Markdown description for TestRail (Cucumber/Gherkin style)
+        Build a Markdown description for TestRail (Clean text style)
         """
         # Header
         md = f"**Feature**: {result.feature}\n"
         md += f"**Scenario**: {result.scenario}\n\n"
         
-        # Steps in Cucumber/Gherkin code block
-        md += "```cucumber\n"
-        
         # Preconditions (Background)
         if result.background_steps:
+            md += "**Background:**\n"
             for step in result.background_steps:
-                md += f"{step}\n"
+                md += f"- {step}\n"
+            md += "\n"
         
         # Steps
+        md += "**Steps:**\n"
         if result.gherkin_steps:
-            for step in result.gherkin_steps:
-                md += f"{step}\n"
+            for i, step in enumerate(result.gherkin_steps, 1):
+                md += f"{i}. {step}\n"
+        
+        md += "\n"
         
         # Expected Results (Assertions)
         if result.expected_assertions:
+            md += "**Verified Assertions:**\n"
             for assertion in result.expected_assertions:
-                # Add match prefix if missing to look like code
                 if not assertion.strip().startswith("match") and not assertion.strip().startswith("status"):
-                   md += f"And match {assertion}\n"
+                   md += f"- And match {assertion}\n"
                 else:
-                   md += f"And {assertion}\n"
-
-        md += "```\n\n"
+                   md += f"- {assertion}\n"
+            md += "\n"
         
         # Status and Details
         if result.status == 'passed':
@@ -156,7 +157,7 @@ class TestRailSync:
             md += "❌ **STATUS: FAILED**\n"
             if result.error_message:
                 md += "\n**Error Details:**\n"
-                md += f"```\n{result.error_message}\n```\n"
+                md += f"{result.error_message}\n" # Plain text for error to avoid markdown issues
 
         if result.duration:
             md += f"\nDuration: {result.duration:.2f}s"
@@ -165,19 +166,19 @@ class TestRailSync:
     
     def _build_preconditions(self, result: TestResult) -> str:
         """Build preconditions from Background steps"""
-        content = ""
+        steps = []
         if result.background_steps and len(result.background_steps) > 0:
-            content = "\n".join(result.background_steps)
+            steps = result.background_steps
         else:
-            content = "Given the API is accessible\nAnd the test environment is configured"
+            steps = ["Given the API is accessible", "And the test environment is configured"]
         
-        return f"```cucumber\n{content}\n```"
+        return "\n".join([f"- {s}" for s in steps])
     
     def _build_steps(self, result: TestResult) -> str:
         """Build test steps from Gherkin definition"""
-        content = ""
+        steps = []
         if result.gherkin_steps and len(result.gherkin_steps) > 0:
-            content = "\n".join(result.gherkin_steps)
+            steps = result.gherkin_steps
         else:
             steps = [
                 "Given Prepare test data",
@@ -185,9 +186,8 @@ class TestRailSync:
                 "Then Verify HTTP response status",
                 "And Validate response body"
             ]
-            content = "\n".join(steps)
             
-        return f"```cucumber\n{content}\n```"
+        return "\n".join([f"{i}. {step}" for i, step in enumerate(steps, 1)])
     
     def _build_expected_result(self, result: TestResult) -> str:
         """Build expected result from assertions and test status"""
@@ -201,20 +201,19 @@ class TestRailSync:
         
         # Error si existe
         if result.error_message:
-            md += f"**Error Details:**\n```\n{result.error_message}\n```\n\n"
+            md += f"**Error Details:**\n{result.error_message}\n\n"
         
         # Aserciones esperadas (match statements)
         if result.expected_assertions and len(result.expected_assertions) > 0:
-            md += "**Verified Assertions:**\n```cucumber\n"
+            md += "**Verified Assertions:**\n"
             for assertion in result.expected_assertions:
                 clean_assertion = assertion.strip()
                 if not clean_assertion.startswith("match") and not clean_assertion.startswith("status") and not clean_assertion.startswith("Then"):
-                    md += f"And match {clean_assertion}\n"
+                    md += f"- And match {clean_assertion}\n"
                 elif clean_assertion.startswith("match"):
-                    md += f"And {clean_assertion}\n"
+                    md += f"- And {clean_assertion}\n"
                 else:
-                    md += f"{clean_assertion}\n"
-            md += "```"
+                    md += f"- {clean_assertion}\n"
         
         return md
     

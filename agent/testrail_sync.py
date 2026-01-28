@@ -11,6 +11,20 @@ from .testrail_client import TestRailClient
 from .state import TestResult
 
 
+class StepType(Enum):
+    """Tipos de pasos Gherkin"""
+    GIVEN = ("Given", "🎯", "#2196F3", "Configuración")
+    WHEN = ("When", "⚡", "#FF9800", "Acción")
+    THEN = ("Then", "✔️", "#4CAF50", "Validación")
+    AND = ("And", "•", "#757575", "Adicional")
+    
+    def __init__(self, keyword: str, icon: str, color: str, label: str):
+        self.keyword = keyword
+        self.icon = icon
+        self.color = color
+        self.label = label
+
+
 class TestRailSync:
     """Synchronize Karate scenarios to TestRail cases"""
     
@@ -119,48 +133,55 @@ class TestRailSync:
     
     def _build_formatted_description(self, result: TestResult) -> str:
         """
-        Build a Markdown description for TestRail (Clean text style)
+        Build a styled Markdown description for TestRail
         """
+        md = ""
+        
         # Header
-        md = f"**Feature**: {result.feature}\n"
+        md += f"## 🧪 {result.feature}\n"
         md += f"**Scenario**: {result.scenario}\n\n"
         
         # Preconditions (Background)
         if result.background_steps:
-            md += "**Background:**\n"
+            md += "### 📋 Background\n"
             for step in result.background_steps:
                 md += f"- {step}\n"
             md += "\n"
         
         # Steps
-        md += "**Steps:**\n"
+        md += "### ⚙️ Steps\n"
         if result.gherkin_steps:
             for i, step in enumerate(result.gherkin_steps, 1):
                 md += f"{i}. {step}\n"
-        
         md += "\n"
         
         # Expected Results (Assertions)
         if result.expected_assertions:
-            md += "**Verified Assertions:**\n"
+            md += "### ✔️ Verified Assertions\n"
             for assertion in result.expected_assertions:
-                if not assertion.strip().startswith("match") and not assertion.strip().startswith("status"):
-                   md += f"- And match {assertion}\n"
-                else:
-                   md += f"- {assertion}\n"
+                clean = assertion.strip()
+                # Clean up verbose keywords
+                if clean.startswith("And match"):
+                    clean = clean[9:].strip()
+                elif clean.startswith("match"):
+                    clean = clean[5:].strip()
+                elif clean.startswith("Then status"):
+                    clean = f"Status {clean[11:].strip()}"
+                    
+                md += f"- {clean}\n"
             md += "\n"
         
         # Status and Details
+        md += "### 📊 Result\n"
         if result.status == 'passed':
-            md += "✅ **STATUS: PASSED**\n"
+            md += "✅ **PASSED**\n"
         else:
-            md += "❌ **STATUS: FAILED**\n"
+            md += "❌ **FAILED**\n"
             if result.error_message:
-                md += "\n**Error Details:**\n"
-                md += f"{result.error_message}\n" # Plain text for error to avoid markdown issues
+                md += f"\n**Error:**  \n{result.error_message}\n"
 
         if result.duration:
-            md += f"\nDuration: {result.duration:.2f}s"
+            md += f"\n⏱️ **Duration**: {result.duration:.2f}s"
             
         return md
     
@@ -172,7 +193,11 @@ class TestRailSync:
         else:
             steps = ["Given the API is accessible", "And the test environment is configured"]
         
-        return "\n".join([f"- {s}" for s in steps])
+        md = "```gherkin\n"
+        for step in steps:
+            md += f"{step}\n"
+        md += "```"
+        return md
     
     def _build_steps(self, result: TestResult) -> str:
         """Build test steps from Gherkin definition"""
@@ -186,34 +211,38 @@ class TestRailSync:
                 "Then Verify HTTP response status",
                 "And Validate response body"
             ]
-            
-        return "\n".join([f"{i}. {step}" for i, step in enumerate(steps, 1)])
+        
+        md = "```gherkin\n"
+        for i, step in enumerate(steps, 1):
+            md += f"{step}\n"
+        md += "```"
+        return md
     
     def _build_expected_result(self, result: TestResult) -> str:
         """Build expected result from assertions and test status"""
         md = ""
         
-        # Status del test
+        # Status
         if result.status == 'passed':
             md += "✅ **Result: PASSED**\n\n"
         else:
             md += "❌ **Result: FAILED**\n\n"
         
-        # Error si existe
-        if result.error_message:
-            md += f"**Error Details:**\n{result.error_message}\n\n"
-        
-        # Aserciones esperadas (match statements)
+        # Assertions
         if result.expected_assertions and len(result.expected_assertions) > 0:
-            md += "**Verified Assertions:**\n"
+            md += "**Expected Assertions:**\n"
+            md += "```gherkin\n"
             for assertion in result.expected_assertions:
-                clean_assertion = assertion.strip()
-                if not clean_assertion.startswith("match") and not clean_assertion.startswith("status") and not clean_assertion.startswith("Then"):
-                    md += f"- And match {clean_assertion}\n"
-                elif clean_assertion.startswith("match"):
-                    md += f"- And {clean_assertion}\n"
+                clean = assertion.strip()
+                if not clean.startswith("match") and not clean.startswith("status"):
+                    md += f"And match {clean}\n"
                 else:
-                    md += f"- {clean_assertion}\n"
+                    md += f"{clean}\n"
+            md += "```\n"
+        
+        # Error details
+        if result.error_message:
+            md += f"\n**Error:**  \n{result.error_message}"
         
         return md
     

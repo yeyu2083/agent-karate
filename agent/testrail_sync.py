@@ -165,57 +165,58 @@ class TestRailSync:
     
     def _build_preconditions(self, result: TestResult) -> str:
         """Build preconditions from Background steps"""
-        preconditions = []
-        
-        # Usar Background steps si existen
+        content = ""
         if result.background_steps and len(result.background_steps) > 0:
-            preconditions = result.background_steps
+            content = "\n".join(result.background_steps)
         else:
-            # Fallback genérico
-            preconditions = [
-                "Given the API is accessible",
-                "And the test environment is configured"
-            ]
+            content = "Given the API is accessible\nAnd the test environment is configured"
         
-        return "\n".join([f"{i+1}. {p}" for i, p in enumerate(preconditions)])
+        return f"```cucumber\n{content}\n```"
     
     def _build_steps(self, result: TestResult) -> str:
         """Build test steps from Gherkin definition"""
+        content = ""
         if result.gherkin_steps and len(result.gherkin_steps) > 0:
-            # Usar pasos reales del .feature
-            return "\n".join([f"{i}. {step}" for i, step in enumerate(result.gherkin_steps, 1)])
-        
-        # Fallback a pasos genéricos
-        steps = [
-            "1. Prepare test data",
-            "2. Send API request",
-            "3. Verify HTTP response status",
-            "4. Validate response body",
-            "5. Assert all conditions pass"
-        ]
-        return "\n".join(steps)
+            content = "\n".join(result.gherkin_steps)
+        else:
+            steps = [
+                "Given Prepare test data",
+                "When Send API request",
+                "Then Verify HTTP response status",
+                "And Validate response body"
+            ]
+            content = "\n".join(steps)
+            
+        return f"```cucumber\n{content}\n```"
     
     def _build_expected_result(self, result: TestResult) -> str:
         """Build expected result from assertions and test status"""
-        lines = []
+        md = ""
         
         # Status del test
         if result.status == 'passed':
-            lines.append("✅ Test execution successful")
+            md += "✅ **Result: PASSED**\n\n"
         else:
-            lines.append("❌ Test failed")
-        
-        # Aserciones esperadas (match statements)
-        if result.expected_assertions and len(result.expected_assertions) > 0:
-            lines.append("\nExpected Assertions:")
-            for assertion in result.expected_assertions:
-                lines.append(f"  • {assertion}")
+            md += "❌ **Result: FAILED**\n\n"
         
         # Error si existe
         if result.error_message:
-            lines.append(f"\nError Details: {result.error_message}")
+            md += f"**Error Details:**\n```\n{result.error_message}\n```\n\n"
         
-        return "\n".join(lines)
+        # Aserciones esperadas (match statements)
+        if result.expected_assertions and len(result.expected_assertions) > 0:
+            md += "**Verified Assertions:**\n```cucumber\n"
+            for assertion in result.expected_assertions:
+                clean_assertion = assertion.strip()
+                if not clean_assertion.startswith("match") and not clean_assertion.startswith("status") and not clean_assertion.startswith("Then"):
+                    md += f"And match {clean_assertion}\n"
+                elif clean_assertion.startswith("match"):
+                    md += f"And {clean_assertion}\n"
+                else:
+                    md += f"{clean_assertion}\n"
+            md += "```"
+        
+        return md
     
     def _get_status_badge(self, status: str) -> str:
         """Generate HTML badge for status"""

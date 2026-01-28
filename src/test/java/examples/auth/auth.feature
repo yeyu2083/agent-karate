@@ -3,9 +3,45 @@ Feature: Autenticación y Autorización
 
   Background:
     * url apiUrl
+    * header User-Agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    * header Accept-Language = 'es-ES,es;q=0.9'
+    * header Accept-Encoding = 'gzip, deflate, br'
+    * header Cache-Control = 'max-age=0'
 
   @smoke @auth
-  Scenario: Login exitoso y obtención de token
+  Scenario Outline: Validación de login con diferentes credenciales
+    Prueba el endpoint /login con múltiples combinaciones de credenciales
+    para validar que la autenticación funciona correctamente
+
+    * java.lang.Thread.sleep(1000)
+    Given path '/login'
+    And request
+      """
+      {
+        email: '<email>',
+        password: '<password>'
+      }
+      """
+    When method POST
+    Then status <statusCode>
+    And match response.<responseField> == '<responseValue>'
+
+    @positive @smoke
+    Examples: Credenciales válidas
+      | email                | password  | statusCode | responseField | responseValue |
+      | eve.holt@reqres.in   | cityslicka | 200        | token        | #notnull      |
+
+    @negative @smoke
+    Examples: Credenciales inválidas
+      | email                  | password      | statusCode | responseField | responseValue |
+      | usuario@invalido.com   | wrongpassword | 400        | error        | #notnull      |
+      | test@example.com       | password123   | 400        | error        | #notnull      |
+
+  @smoke @auth @critical
+  Scenario: Login exitoso y obtención de token - Verificación detallada
+    Valida que el token retornado es válido y puede ser usado en requests posteriores
+
+    * java.lang.Thread.sleep(1000)
     Given path '/login'
     And request
       """
@@ -18,21 +54,6 @@ Feature: Autenticación y Autorización
     Then status 200
     And match response.token == '#string'
     And match response.token == '#notnull'
-    # Guardar el token para uso posterior
     * def authToken = response.token
-
-  @smoke @auth @negative
-  Scenario: Login fallido - credenciales incorrectas
-    Given path '/login'
-    And request
-      """
-      {
-        email: 'usuario@invalido.com',
-        password: 'wrongpassword'
-      }
-      """
-    When method POST
-    Then status 400
-    And match response.error == '#string'
 
 

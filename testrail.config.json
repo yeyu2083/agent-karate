@@ -1,0 +1,13 @@
+{
+  "testrail": {
+    "project_id": 2,
+    "suite_id": 6,
+    "environment": "dev"
+  },
+  "karate": {
+    "results_path": "target/karate-reports/karate-summary.json"
+  },
+  "alerts": {
+    "fail_rate_threshold": 20
+  }
+}

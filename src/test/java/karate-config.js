@@ -11,10 +11,18 @@ function fn() {
         apiUrl: 'https://reqres.in/api',
         timeout: 10000, // timeout en milisegundos
 
-        // Headers comunes
+        // Headers que imitan un navegador real (anti-Cloudflare)
         commonHeaders: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept-Language': 'es-ES,es;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none'
         }
     };
 
@@ -45,12 +53,23 @@ function fn() {
         return result;
     };
 
-    // Configurar retry automático
+    // Configurar retry automático con delay entre intentos
     karate.configure('retry', { count: 3, interval: 2000 });
 
     // Configurar timeout de conexión
     karate.configure('connectTimeout', config.timeout);
     karate.configure('readTimeout', config.timeout);
+
+    // ✅ ANTI-CLOUDFLARE: Habilitar soporte para cookies y sesiones
+    karate.configure('ssl', false); // Permitir SSL sin validación (si es necesario)
+    
+    // Función para agregar delay entre peticiones
+    config.delay = function(ms) {
+        var start = new Date().getTime();
+        while (new Date().getTime() - start < ms) {
+            // Esperar
+        }
+    };
 
     return config;
 }

@@ -1,18 +1,23 @@
+# graph.py
+"""
+LangGraph workflow for TestRail integration
+Note: Graph structure kept for future extensibility with AI feedback
+"""
 from langgraph.graph import StateGraph, END
 from .state import AgentState
-from .nodes import analyze_results_node, map_to_xray_node, upload_to_jira_node
 
 
-def create_agent_graph() -> StateGraph:
-    graph = StateGraph(AgentState)
+def create_agent_graph():
+    """Create workflow graph (currently linear, can be extended for AI analysis)"""
+    workflow = StateGraph(AgentState)
     
-    graph.add_node("analyze", analyze_results_node)
-    graph.add_node("map_to_xray", map_to_xray_node)
-    graph.add_node("upload", upload_to_jira_node)
+    # Currently using direct main.py flow, but graph structure available for future AI nodes
+    # Future enhancements:
+    # - workflow.add_node("analyze_results_with_ai", analyze_ai_node)
+    # - workflow.add_node("feedback_generation", feedback_node)
     
-    graph.set_entry_point("analyze")
-    graph.add_edge("analyze", "map_to_xray")
-    graph.add_edge("map_to_xray", "upload")
-    graph.add_edge("upload", END)
+    workflow.set_entry_point("finalize")
+    workflow.add_node("finalize", lambda x: x)
+    workflow.add_edge("finalize", END)
     
-    return graph.compile()
+    return workflow.compile()

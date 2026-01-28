@@ -3,10 +3,11 @@ target/
 karate-reports/
 *.log
 
-# Maven
-.mvn/
-mvnw
-mvnw.cmd
+# Generated Reports (Downloaded from GitHub Actions artifacts)
+test-report.html
+testrail-dashboard.html
+testrail-run-data.json
+testrail-output.log
 
 # IDE
 .idea/

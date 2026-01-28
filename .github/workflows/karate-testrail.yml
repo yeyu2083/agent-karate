@@ -159,16 +159,44 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const log = fs.readFileSync('testrail-output.log', 'utf8');
+            let reportData = null;
+            let markdown = '';
             
-            // Extract summary from log
-            const summary = log.split('\n').slice(-20).join('\n');
+            // Try to read the report data file
+            try {
+              const rawData = fs.readFileSync('testrail-run-data.json', 'utf8');
+              reportData = JSON.parse(rawData);
+              markdown = reportData.markdown;
+            } catch (e) {
+              // Fallback to parsing log
+              const log = fs.readFileSync('testrail-output.log', 'utf8');
+              markdown = log.split('\n').slice(-25).join('\n');
+            }
+            
+            const buildNumber = '${{ steps.metadata.outputs.build_number }}';
+            const branch = '${{ steps.metadata.outputs.branch_name }}';
+            const commitSha = '${{ steps.metadata.outputs.commit_sha }}';
+            const jiraIssue = '${{ steps.metadata.outputs.jira_issue }}';
+            
+            // Build PR comment
+            let comment = `## 🧪 Karate → TestRail Results\n\n`;
+            comment += `**Build #${buildNumber}** · \`${branch}\` · ${commitSha}\n\n`;
+            
+            if (jiraIssue) {
+              comment += `📋 **Jira**: ${jiraIssue}\n\n`;
+            }
+            
+            comment += markdown;
+            
+            comment += `\n\n---\n`;
+            comment += `📦 [Download Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
+            comment += `🔍 [View Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## 🧪 Karate Tests Report\n\n\`\`\`\n${summary}\n\`\`\`\n\n📊 [View in TestRail](${{ secrets.TESTRAIL_URL }}/index.php?/runs/view/${{ steps.testrail.outputs.run_id }})`
+              body: comment
             });
         continue-on-error: true
       
@@ -181,5 +209,6 @@ jobs:
           path: |
             karate.json
             testrail-output.log
+            testrail-run-data.json
             src/test/java/target/karate-reports/
           retention-days: 30

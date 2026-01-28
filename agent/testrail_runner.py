@@ -117,12 +117,19 @@ class TestRailRunner:
         
         return False
     
-    def generate_run_report(self, run_id: int) -> str:
-        """Generate markdown report for a run"""
+    def generate_run_report(self, run_id: int) -> dict:
+        """Generate comprehensive report for a run (returns dict with markdown and data)"""
         run = self.client.get_run(run_id)
         
         if not run:
-            return f"❌ Could not retrieve run #{run_id}"
+            return {
+                'markdown': f"❌ Could not retrieve run #{run_id}",
+                'run_id': run_id,
+                'passed': 0,
+                'failed': 0,
+                'skipped': 0,
+                'total': 0
+            }
         
         # Get tests and results
         tests = self.client.get_tests(run_id)
@@ -138,28 +145,50 @@ class TestRailRunner:
         
         pass_rate = (passed / total * 100) if total > 0 else 0
         
-        report = f"""
-# TestRail Run Report: {run['name']}
+        # Build status emoji
+        if failed == 0:
+            status_emoji = "✅"
+        elif passed == 0:
+            status_emoji = "❌"
+        else:
+            status_emoji = "⚠️"
+        
+        report = f"""{status_emoji} **TestRail Run #{run['id']}** - {run['name']}
 
-## Summary
-- **Run ID**: #{run['id']}
-- **Total**: {total}
-- **Passed**: {passed} ({pass_rate:.1f}%)
-- **Failed**: {failed}
-- **Skipped**: {skipped}
-- **URL**: {self.client.settings.testrail_url}/index.php?/runs/view/{run['id']}
+### 📊 Results Summary
+| Metric | Count | Rate |
+|--------|-------|------|
+| Total | {total} | 100% |
+| ✅ Passed | {passed} | {pass_rate:.1f}% |
+| ❌ Failed | {failed} | {(failed/total*100):.1f}% if {total} > 0 else 0 |
+| ⏭️ Skipped | {skipped} | {(skipped/total*100):.1f}% if {total} > 0 else 0 |
 
-## Failed Tests
+### 🔗 Links
+- [View in TestRail]({self.client.settings.testrail_url}/index.php?/runs/view/{run['id']})
+
+### Failed Tests
 """
         
-        for result in results:
-            if result.get('status_id') == 5:  # Failed
-                test_id = result.get('test_id')
-                case_id = test_to_case.get(test_id, 'unknown')
-                comment = result.get('comment', 'N/A')
-                report += f"\n- Case #{case_id}: {comment}"
+        if failed > 0:
+            for result in results:
+                if result.get('status_id') == 5:  # Failed
+                    test_id = result.get('test_id')
+                    case_id = test_to_case.get(test_id, 'unknown')
+                    comment = result.get('comment', 'N/A')
+                    report += f"- **Case #{case_id}**: {comment}\n"
+        else:
+            report += "✅ All tests passed!\n"
         
-        return report
+        return {
+            'markdown': report,
+            'run_id': run_id,
+            'passed': passed,
+            'failed': failed,
+            'skipped': skipped,
+            'total': total,
+            'pass_rate': pass_rate,
+            'testrail_url': f"{self.client.settings.testrail_url}/index.php?/runs/view/{run['id']}"
+        }
     
     def _build_description(self, build_data: Dict[str, Any]) -> str:
         """Build run description"""

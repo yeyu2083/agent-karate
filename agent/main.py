@@ -152,8 +152,13 @@ def main():
     # Generate report
     print("\n📝 Generating report...")
     try:
-        report = runner.generate_run_report(run_id)
-        print(report)
+        report_data = runner.generate_run_report(run_id)
+        print(report_data['markdown'])
+        
+        # Save report data for GitHub Actions
+        import json
+        with open('testrail-run-data.json', 'w') as f:
+            json.dump(report_data, f)
     except Exception as e:
         print(f"⚠️ Report error: {e}")
     

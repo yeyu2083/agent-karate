@@ -11,312 +11,6 @@ from .testrail_client import TestRailClient
 from .state import TestResult
 
 
-class StepType(Enum):
-    """Tipos de pasos Gherkin"""
-    GIVEN = ("Given", "🎯", "#2196F3", "Configuración")
-    WHEN = ("When", "⚡", "#FF9800", "Acción")
-    THEN = ("Then", "✔️", "#4CAF50", "Validación")
-    AND = ("And", "•", "#757575", "Adicional")
-    
-    def __init__(self, keyword: str, icon: str, color: str, label: str):
-        self.keyword = keyword
-        self.icon = icon
-        self.color = color
-        self.label = label
-
-
-class TestDescriptionBuilder:
-    """
-    Constructor moderno y elegante para descripciones HTML de TestRail
-    Implementa patrón Builder para código limpio y mantenible
-    """
-    
-    # Paleta de colores moderna
-    COLORS = {
-        'primary_start': '#667eea',
-        'primary_end': '#764ba2',
-        'secondary': '#FF9800',
-        'success': '#4CAF50',
-        'error': '#f44336',
-        'info': '#2196F3',
-        'warning': '#FFC107',
-        'background': '#f5f5f5',
-        'white': '#ffffff',
-    }
-    
-    FONTS = {
-        'primary': "'Segoe UI', 'Tahoma', 'Geneva', 'Verdana', sans-serif",
-        'mono': "'Courier New', 'Courier', monospace",
-    }
-    
-    def __init__(self, feature_name: str, scenario_name: str = None):
-        self.feature = feature_name
-        self.scenario = scenario_name or feature_name
-        self.sections = []
-        self.status = None
-        self.duration = None
-        self.error_msg = None
-    
-    def set_status(self, status: str, duration: float = None, error: str = None) -> 'TestDescriptionBuilder':
-        """Establecer estado del test (passed/failed)"""
-        self.status = status
-        self.duration = duration
-        self.error_msg = error
-        return self
-    
-    def add_preconditions(self, steps: List[str]) -> 'TestDescriptionBuilder':
-        """Agregar sección de Precondiciones"""
-        if steps and len(steps) > 0:
-            self.sections.append({
-                'type': 'preconditions',
-                'icon': '📋',
-                'title': 'Precondiciones',
-                'color': self.COLORS['info'],
-                'items': steps
-            })
-        return self
-    
-    def add_steps(self, steps: List[str]) -> 'TestDescriptionBuilder':
-        """Agregar sección de Pasos con diferenciación de tipos"""
-        if steps and len(steps) > 0:
-            self.sections.append({
-                'type': 'steps',
-                'icon': '🔧',
-                'title': 'Pasos',
-                'color': self.COLORS['secondary'],
-                'items': steps
-            })
-        return self
-    
-    def add_expected(self, assertions: List[str]) -> 'TestDescriptionBuilder':
-        """Agregar sección de Resultados Esperados"""
-        if assertions and len(assertions) > 0:
-            self.sections.append({
-                'type': 'expected',
-                'icon': '🎯',
-                'title': 'Resultados Esperados',
-                'color': '#9C27B0',
-                'items': assertions
-            })
-        return self
-    
-    def build(self) -> str:
-        """Construir HTML final estilizado"""
-        html_parts = []
-        
-        # Header elegante con gradiente
-        html_parts.append(self._build_header())
-        
-        # Secciones
-        for section in self.sections:
-            html_parts.append(self._build_section(section))
-        
-        # Error details si aplica
-        if self.status == 'failed' and self.error_msg:
-            html_parts.append(self._build_error_section())
-        
-        # Footer con info de automatización
-        html_parts.append(self._build_automation_info())
-        
-        return '\n'.join(html_parts)
-    
-    def _build_header(self) -> str:
-        """Construir header con gradiente y status"""
-        status_badge = self._get_status_badge()
-        exec_time = f"⏱️ {self.duration:.2f}s" if self.duration else "⏱️ N/A"
-        
-        return f"""
-<div style="font-family: {self.FONTS['primary']}; background: linear-gradient(135deg, {self.COLORS['primary_start']} 0%, {self.COLORS['primary_end']} 100%); 
-            padding: 24px; border-radius: 12px; color: white; margin-bottom: 20px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-        <div style="flex: 1;">
-            <h2 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600;">
-                🧪 {self.feature}
-            </h2>
-            <p style="margin: 0; font-size: 14px; opacity: 0.9; font-weight: 500;">
-                {self.scenario}
-            </p>
-        </div>
-        <div style="text-align: right;">
-            {status_badge}
-            <p style="margin: 8px 0 0 0; font-size: 13px; opacity: 0.9;">
-                {exec_time}
-            </p>
-        </div>
-    </div>
-</div>
-"""
-    
-    def _build_section(self, section: dict) -> str:
-        """Construir sección individual con estilo"""
-        color = section['color']
-        icon = section['icon']
-        title = section['title']
-        
-        items_html = []
-        for item in section['items']:
-            if section['type'] == 'steps':
-                items_html.append(self._style_step(item))
-            else:
-                items_html.append(self._style_item(item))
-        
-        items_content = '\n'.join(items_html)
-        
-        return f"""
-<div style="margin: 16px 0; border-radius: 12px; overflow: hidden; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08); background: white;">
-    <div style="background: linear-gradient(90deg, {color} 0%, {self._lighten_color(color, 30)} 100%);
-                color: white; padding: 16px 20px; font-weight: 600; font-size: 15px;">
-        <span style="font-size: 18px; margin-right: 8px;">{icon}</span>
-        {title}
-    </div>
-    <div style="padding: 16px 20px; background-color: {self._lighten_color(color, 95)};">
-        {items_content}
-    </div>
-</div>
-"""
-    
-    def _style_item(self, item: str) -> str:
-        """Estilizar item genérico"""
-        return f"""
-        <div style="margin: 8px 0; padding: 10px; padding-left: 16px; 
-                    background-color: white; border-left: 3px solid {self.COLORS['info']};
-                    border-radius: 4px; font-size: 13px; color: #333;">
-            ✓ {item}
-        </div>
-"""
-    
-    def _style_step(self, step: str) -> str:
-        """Estilizar pasos con diferenciación de tipos"""
-        # Detectar tipo de paso
-        step_type = None
-        for stype in StepType:
-            if step.startswith(stype.keyword):
-                step_type = stype
-                break
-        
-        if not step_type:
-            step_type = StepType.AND
-        
-        return f"""
-        <div style="margin: 8px 0; padding: 12px; padding-left: 16px;
-                    background-color: white; border-left: 4px solid {step_type.color};
-                    border-radius: 4px; font-size: 13px; color: #333;
-                    transition: all 0.2s ease;">
-            <span style="color: {step_type.color}; font-weight: bold; margin-right: 8px;">
-                {step_type.icon}
-            </span>
-            <span style="background-color: {self._lighten_color(step_type.color, 85)}; 
-                        color: {step_type.color}; padding: 2px 6px; border-radius: 3px;
-                        font-weight: 600; font-size: 11px; margin-right: 8px;">
-                {step_type.label}
-            </span>
-            {step}
-        </div>
-"""
-    
-    def _get_status_badge(self) -> str:
-        """Generar badge de estado"""
-        if self.status == 'passed':
-            return f"""
-            <div style="display: inline-block; background-color: {self.COLORS['success']};
-                       color: white; padding: 6px 14px; border-radius: 20px;
-                       font-weight: 600; font-size: 12px;">
-                ✓ PASSED
-            </div>
-"""
-        elif self.status == 'failed':
-            return f"""
-            <div style="display: inline-block; background-color: {self.COLORS['error']};
-                       color: white; padding: 6px 14px; border-radius: 20px;
-                       font-weight: 600; font-size: 12px;">
-                ✗ FAILED
-            </div>
-"""
-        else:
-            return f"""
-            <div style="display: inline-block; background-color: {self.COLORS['warning']};
-                       color: white; padding: 6px 14px; border-radius: 20px;
-                       font-weight: 600; font-size: 12px;">
-                ⏳ UNKNOWN
-            </div>
-"""
-    
-    def _build_error_section(self) -> str:
-        """Construir sección de error"""
-        return f"""
-<div style="margin: 16px 0; border-radius: 12px; overflow: hidden;
-            box-shadow: 0 2px 8px rgba(244,67,54,0.15);">
-    <div style="background: linear-gradient(90deg, {self.COLORS['error']} 0%, #e53935 100%);
-                color: white; padding: 16px 20px; font-weight: 600; font-size: 15px;">
-        <span style="font-size: 18px; margin-right: 8px;">❌</span>
-        Detalles del Error
-    </div>
-    <div style="padding: 16px 20px; background-color: #ffebee;">
-        <div style="background-color: white; padding: 12px; border-radius: 6px;
-                    font-family: {self.FONTS['mono']}; font-size: 12px;
-                    color: #d32f2f; word-break: break-word; line-height: 1.6;
-                    border-left: 4px solid {self.COLORS['error']};">
-            {self.error_msg}
-        </div>
-    </div>
-</div>
-"""
-    
-    def _build_automation_info(self) -> str:
-        """Construir sección de info de automatización"""
-        return f"""
-<div style="margin: 16px 0; border-radius: 12px; overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-    <div style="background: linear-gradient(90deg, {self.COLORS['info']} 0%, #1565c0 100%);
-                color: white; padding: 16px 20px; font-weight: 600; font-size: 15px;">
-        <span style="font-size: 18px; margin-right: 8px;">⚙️</span>
-        Información de Automatización
-    </div>
-    <div style="padding: 16px 20px; background-color: #e3f2fd;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-            <tr>
-                <td style="border: 1px solid #bbdefb; padding: 10px; background-color: white; 
-                          font-weight: 600; width: 35%; color: {self.COLORS['info']};">
-                    🐉 Framework
-                </td>
-                <td style="border: 1px solid #bbdefb; padding: 10px; background-color: #f5f5f5;">
-                    Karate DSL
-                </td>
-            </tr>
-            <tr>
-                <td style="border: 1px solid #bbdefb; padding: 10px; background-color: white;
-                          font-weight: 600; color: {self.COLORS['info']};">
-                    📝 Tipo
-                </td>
-                <td style="border: 1px solid #bbdefb; padding: 10px; background-color: #f5f5f5;">
-                    BDD/Gherkin (Behavioral Testing)
-                </td>
-            </tr>
-            <tr>
-                <td style="border: 1px solid #bbdefb; padding: 10px; background-color: white;
-                          font-weight: 600; color: {self.COLORS['info']};">
-                    ✅ Automatizado
-                </td>
-                <td style="border: 1px solid #bbdefb; padding: 10px; background-color: #f5f5f5;">
-                    Sí • Sincronizado con TestRail
-                </td>
-            </tr>
-        </table>
-    </div>
-</div>
-"""
-    
-    @staticmethod
-    def _lighten_color(hex_color: str, percent: int) -> str:
-        """Aclarar un color HEX en porcentaje"""
-        hex_color = hex_color.lstrip('#')
-        rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-        rgb = tuple(min(255, int(c + (255 - c) * percent / 100)) for c in rgb)
-        return f"#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}"
-
-
 class TestRailSync:
     """Synchronize Karate scenarios to TestRail cases"""
     
@@ -425,15 +119,49 @@ class TestRailSync:
     
     def _build_formatted_description(self, result: TestResult) -> str:
         """
-        Construir descripción HTML moderna y elegante usando TestDescriptionBuilder
+        Build a Markdown description for TestRail (Cucumber/Gherkin style)
         """
-        builder = (TestDescriptionBuilder(result.feature, result.scenario)
-            .set_status(result.status, result.duration, result.error_message)
-            .add_preconditions(result.background_steps)
-            .add_steps(result.gherkin_steps)
-            .add_expected(result.expected_assertions))
+        # Header
+        md = f"**Feature**: {result.feature}\n"
+        md += f"**Scenario**: {result.scenario}\n\n"
         
-        return builder.build()
+        # Steps in Cucumber/Gherkin code block
+        md += "```cucumber\n"
+        
+        # Preconditions (Background)
+        if result.background_steps:
+            for step in result.background_steps:
+                md += f"{step}\n"
+        
+        # Steps
+        if result.gherkin_steps:
+            for step in result.gherkin_steps:
+                md += f"{step}\n"
+        
+        # Expected Results (Assertions)
+        if result.expected_assertions:
+            for assertion in result.expected_assertions:
+                # Add match prefix if missing to look like code
+                if not assertion.strip().startswith("match") and not assertion.strip().startswith("status"):
+                   md += f"And match {assertion}\n"
+                else:
+                   md += f"And {assertion}\n"
+
+        md += "```\n\n"
+        
+        # Status and Details
+        if result.status == 'passed':
+            md += "✅ **STATUS: PASSED**\n"
+        else:
+            md += "❌ **STATUS: FAILED**\n"
+            if result.error_message:
+                md += "\n**Error Details:**\n"
+                md += f"```\n{result.error_message}\n```\n"
+
+        if result.duration:
+            md += f"\nDuration: {result.duration:.2f}s"
+            
+        return md
     
     def _build_preconditions(self, result: TestResult) -> str:
         """Build preconditions from Background steps"""

@@ -45,7 +45,6 @@ Feature: API de Posts - Pruebas de Publicaciones
     And match response[0].id == '#number'
     And match response[0].title == '#string'
     And match response[0].body == '#string'
-    And match response.length >= 100
     And match response.length == 100
 
   @post @create

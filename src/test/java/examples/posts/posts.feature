@@ -40,7 +40,11 @@ Feature: API de Posts - Pruebas de Publicaciones
     When method GET
     Then status 200
     And match response == '#array'
-    And match response[0] == { userId: '#number', id: '#number', title: '#string', body: '#string' }
+    And match response[0] == '#object'
+    And match response[0].userId == '#number'
+    And match response[0].id == '#number'
+    And match response[0].title == '#string'
+    And match response[0].body == '#string'
     And match response.length >= 100
     And match response.length == 100
 

@@ -118,81 +118,126 @@ class TestRailSync:
     
     def _build_formatted_description(self, result: TestResult) -> str:
         """
-        Build an HTML-formatted description for TestRail
-        Includes feature, steps, execution status and automation info
+        Build a modern, visually appealing HTML description for TestRail
         """
-        
-        # Status badge
         status_badge = self._get_status_badge(result.status)
-        execution_time = f"⏱️ {result.duration:.2f}s" if result.duration else "⏱️ N/A"
+        execution_time = f"{result.duration:.2f}s" if result.duration else "N/A"
         
-        description_html = f"""
-<div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-<h3>📋 Feature: <strong>{result.feature}</strong></h3>
-<p style="margin: 5px 0;"><strong>Status:</strong> {status_badge} | {execution_time}</p>
-"""
+        # Color scheme based on status
+        color = "#4caf50" if result.status == 'passed' else "#f44336"
+        light_color = "#e8f5e9" if result.status == 'passed' else "#ffebee"
         
-        # Add error details if present
-        if result.error_message:
-            description_html += f'<p style="margin: 5px 0;"><strong>Summary:</strong> {result.error_message}</p>\n'
-        
-        description_html += """</div>
+        html = f"""
+<div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 8px; color: white; margin-bottom: 15px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h3 style="margin: 0 0 5px 0; font-size: 20px;">🧪 {result.feature}</h3>
+            <p style="margin: 0; font-size: 14px; opacity: 0.9;">{result.scenario}</p>
+        </div>
+        <div style="text-align: right;">
+            {status_badge}
+            <p style="margin: 5px 0 0 0; font-size: 12px;">⏱️ {execution_time}</p>
+        </div>
+    </div>
+</div>
 
-<h4>📝 Test Scenarios:</h4>
-<ul style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin: 10px 0;">
+<div style="margin: 15px 0; padding: 15px; background-color: #f5f5f5; border-radius: 8px; border-left: 4px solid {color};">
+    <h4 style="margin: 0 0 10px 0; color: {color}; font-size: 16px;">📋 Precondiciones</h4>
+    <div style="background-color: white; padding: 10px; border-radius: 5px; font-size: 13px;">
 """
         
-        # If we have individual steps, show them
-        if result.steps:
-            for i, step in enumerate(result.steps, 1):
-                step_text = step.get('text', 'N/A') if isinstance(step, dict) else str(step)
-                step_status = step.get('status', 'unknown') if isinstance(step, dict) else 'unknown'
-                status_emoji = '✅' if step_status == 'passed' else '❌' if step_status == 'failed' else '⚠️'
-                step_keyword = step.get('keyword', '•').strip() if isinstance(step, dict) else '•'
-                duration_ms = step.get('duration_ms', 0) if isinstance(step, dict) else 0
-                
-                duration_str = f" ({duration_ms:.0f}ms)" if duration_ms > 0 else ""
-                description_html += f'<li>{status_emoji} <strong>{step_keyword}</strong> {step_text}{duration_str}</li>\n'
+        # Precondiciones
+        if result.background_steps:
+            for step in result.background_steps:
+                html += f"        <div style=\"margin: 5px 0; padding-left: 15px; border-left: 2px solid #2196F3;\">{step}</div>\n"
         else:
-            # Fallback mode: show feature summary
-            description_html += f'<li>📊 {result.scenario}</li>\n'
+            html += "        <div style=\"color: #999;\">Ninguna precondición especificada</div>\n"
         
-        description_html += """</ul>
+        html += """    </div>
+</div>
 
-<h4>📊 Expected Result:</h4>
-<p style="background-color: #e8f5e9; padding: 10px; border-left: 4px solid #4caf50; border-radius: 3px; margin: 10px 0;">
-Test should pass without errors. All API responses must match expected schemas and status codes.
-</p>
+<div style="margin: 15px 0; padding: 15px; background-color: #f5f5f5; border-radius: 8px; border-left: 4px solid #FF9800;">
+    <h4 style="margin: 0 0 10px 0; color: #FF9800; font-size: 16px;">🔧 Pasos</h4>
+    <div style="background-color: white; padding: 10px; border-radius: 5px; font-size: 13px;">
 """
         
-        # Add error if failed
+        # Steps del Gherkin
+        if result.gherkin_steps:
+            for step in result.gherkin_steps:
+                # Diferenciar tipos de pasos por color
+                if 'Given' in step:
+                    icon = "🎯"
+                    color_step = "#2196F3"
+                elif 'When' in step:
+                    icon = "⚡"
+                    color_step = "#FF9800"
+                elif 'Then' in step:
+                    icon = "✔️"
+                    color_step = "#4CAF50"
+                else:
+                    icon = "•"
+                    color_step = "#757575"
+                
+                html += f"""        <div style="margin: 5px 0; padding: 8px; padding-left: 15px; border-left: 3px solid {color_step}; background-color: #fafafa;">
+            <span style="color: {color_step}; font-weight: bold;">{icon}</span> {step}
+        </div>
+"""
+        else:
+            html += "        <div style=\"color: #999;\">Ningún paso especificado</div>\n"
+        
+        html += """    </div>
+</div>
+
+<div style="margin: 15px 0; padding: 15px; background-color: #f5f5f5; border-radius: 8px; border-left: 4px solid #9C27B0;">
+    <h4 style="margin: 0 0 10px 0; color: #9C27B0; font-size: 16px;">🎯 Resultado Esperado</h4>
+    <div style="background-color: white; padding: 10px; border-radius: 5px; font-size: 13px;">
+"""
+        
+        # Expected Assertions
+        if result.expected_assertions:
+            for assertion in result.expected_assertions:
+                html += f"""        <div style="margin: 5px 0; padding: 8px; padding-left: 15px; border-left: 3px solid #9C27B0; background-color: #fafafa;">
+            ✓ {assertion}
+        </div>
+"""
+        else:
+            html += "        <div style=\"color: #999;\">Ninguna aserción especificada</div>\n"
+        
+        # Error details
         if result.status == 'failed' and result.error_message:
-            description_html += f"""
-<h4>❌ Failure Details:</h4>
-<p style="background-color: #ffebee; padding: 10px; border-left: 4px solid #f44336; border-radius: 3px; margin: 10px 0;">
-<strong>Error:</strong> {result.error_message}
-</p>
+            html += f"""    </div>
+</div>
+
+<div style="margin: 15px 0; padding: 15px; background-color: #ffebee; border-radius: 8px; border-left: 4px solid #f44336;">
+    <h4 style="margin: 0 0 10px 0; color: #f44336; font-size: 16px;">❌ Error</h4>
+    <div style="background-color: white; padding: 10px; border-radius: 5px; font-size: 12px; color: #d32f2f; font-family: 'Courier New', monospace; word-break: break-word;">
+        {result.error_message}
+    </div>
 """
         
-        description_html += """
-<h4>⚙️ Automation Info</h4>
-<table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
-<tr>
-  <td style="border: 1px solid #ddd; padding: 5px;"><strong>Framework</strong></td>
-  <td style="border: 1px solid #ddd; padding: 5px;">Karate DSL (API Testing)</td>
-</tr>
-<tr>
-  <td style="border: 1px solid #ddd; padding: 5px;"><strong>Automation Type</strong></td>
-  <td style="border: 1px solid #ddd; padding: 5px;">Behavioral (BDD/Gherkin)</td>
-</tr>
-<tr>
-  <td style="border: 1px solid #ddd; padding: 5px;"><strong>Automated</strong></td>
-  <td style="border: 1px solid #ddd; padding: 5px;">✅ Yes</td>
-</tr>
-</table>
+        html += """    </div>
+</div>
+
+<div style="margin: 15px 0; padding: 15px; background-color: #e3f2fd; border-radius: 8px; border-left: 4px solid #1976D2;">
+    <h4 style="margin: 0 0 10px 0; color: #1976D2; font-size: 16px;">⚙️ Info de Automatización</h4>
+    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        <tr>
+            <td style="border: 1px solid #e0e0e0; padding: 8px; background-color: #f5f5f5; font-weight: bold; width: 40%;">Framework</td>
+            <td style="border: 1px solid #e0e0e0; padding: 8px;">🐉 Karate DSL</td>
+        </tr>
+        <tr>
+            <td style="border: 1px solid #e0e0e0; padding: 8px; background-color: #f5f5f5; font-weight: bold;">Tipo</td>
+            <td style="border: 1px solid #e0e0e0; padding: 8px;">BDD/Gherkin (Behavioral)</td>
+        </tr>
+        <tr>
+            <td style="border: 1px solid #e0e0e0; padding: 8px; background-color: #f5f5f5; font-weight: bold;">Automatizado</td>
+            <td style="border: 1px solid #e0e0e0; padding: 8px;">✅ Sí</td>
+        </tr>
+    </table>
+</div>
 """
         
-        return description_html
+        return html
     
     def _build_preconditions(self, result: TestResult) -> str:
         """Build preconditions from Background steps"""

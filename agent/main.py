@@ -23,6 +23,26 @@ def find_karate_results() -> str:
     # Get the project root (parent of agent/)
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
+    # Primero buscar archivos detallados .karate-json.txt
+    print(f"📍 Searching in: {project_root}")
+    print("   Looking for detailed scenario files (.karate-json.txt):")
+    
+    import glob
+    detailed_patterns = [
+        os.path.join(project_root, "target/karate-reports/*.karate-json.txt"),
+        os.path.join(project_root, "src/test/java/target/karate-reports/*.karate-json.txt"),
+    ]
+    
+    for pattern in detailed_patterns:
+        matches = glob.glob(pattern)
+        for match in matches:
+            print(f"   ✓ {match}")
+            if os.path.exists(match):
+                print(f"✓ Found detailed Karate results: {match}")
+                return match
+    
+    # Fallback a archivos summary
+    print("   Falling back to summary files:")
     paths = [
         os.path.join(project_root, "karate.json"),
         os.path.join(project_root, "target/karate-reports/karate.json"),
@@ -31,7 +51,6 @@ def find_karate_results() -> str:
         os.path.join(project_root, "src/test/java/target/karate-reports/karate.json"),
     ]
     
-    print(f"📍 Searching in: {project_root}")
     for i, path in enumerate(paths, 1):
         exists = "✓" if os.path.exists(path) else "✗"
         print(f"   {i}. {exists} {path}")

@@ -124,7 +124,12 @@ class TestRailRunner:
         if not run:
             return f"❌ Could not retrieve run #{run_id}"
         
+        # Get tests and results
+        tests = self.client.get_tests(run_id)
         results = self.client.get_results_for_run(run_id)
+        
+        # Build test_id → case_id mapping
+        test_to_case = {test['id']: test['case_id'] for test in tests}
         
         passed = sum(1 for r in results if r.get('status_id') == 1)
         failed = sum(1 for r in results if r.get('status_id') == 5)
@@ -149,7 +154,8 @@ class TestRailRunner:
         
         for result in results:
             if result.get('status_id') == 5:  # Failed
-                case_id = result.get('case_id')
+                test_id = result.get('test_id')
+                case_id = test_to_case.get(test_id, 'unknown')
                 comment = result.get('comment', 'N/A')
                 report += f"\n- Case #{case_id}: {comment}"
         

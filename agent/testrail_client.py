@@ -146,8 +146,7 @@ class TestRailClient:
         """POST /add_case/{section_id}"""
         url = f"{self.base_url}/add_case/{section_id}"
         try:
-            print(f"   DEBUG: Sending to {url}")
-            print(f"   DEBUG: Payload = {case_data}")
+
             response = requests.post(
                 url,
                 auth=self.auth,
@@ -294,8 +293,7 @@ class TestRailClient:
         url = f"{self.base_url}/add_results/{run_id}"
         try:
             payload = {"results": results}
-            print(f"   DEBUG: Sending batch results to {url}")
-            print(f"   DEBUG: Payload = {json.dumps(payload, indent=2)}")
+
             response = requests.post(
                 url,
                 auth=self.auth,

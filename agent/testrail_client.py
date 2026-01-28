@@ -250,6 +250,28 @@ class TestRailClient:
             print(f"❌ Error closing run {run_id}: {e}")
             return False
     
+    def get_tests(self, run_id: int) -> List[Dict[str, Any]]:
+        """GET /get_tests/{run_id}"""
+        url = f"{self.base_url}/get_tests/{run_id}"
+        try:
+            response = requests.get(
+                url,
+                auth=self.auth,
+                headers=self.headers
+            )
+            response.raise_for_status()
+            data = response.json()
+            # TestRail API v2 wraps results in a dict with 'tests' key
+            if isinstance(data, dict) and 'tests' in data:
+                return data['tests']
+            # Fallback for other formats
+            if isinstance(data, dict):
+                return list(data.values())
+            return data if isinstance(data, list) else []
+        except Exception as e:
+            print(f"❌ Error getting tests: {e}")
+            return []
+    
     # ===== Test Result Management =====
     def add_result(self, run_id: int, case_id: int, result_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """POST /add_result_for_case/{run_id}/{case_id}"""

@@ -30,17 +30,7 @@ class TestRailRunner:
             'description': self._build_description(build_data),
             'include_all': False,
             'case_ids': case_ids,
-            
-            # Custom fields
-            'custom_build_number': str(build_data['build_number']),
-            'custom_branch': build_data['branch'],
-            'custom_commit_sha': build_data['commit_sha'],
-            'custom_environment': build_data.get('environment', 'dev'),
         }
-        
-        # Add Jira issue if provided
-        if build_data.get('jira_issue'):
-            run_payload['custom_jira_issue'] = build_data['jira_issue']
         
         run = self.client.add_run(project_id, run_payload)
         
@@ -65,6 +55,15 @@ class TestRailRunner:
             case_id_map: Mapping of automation_id → case_id
         """
         
+        # Get tests in the run to get test_ids
+        tests_in_run = self.client.get_tests(run_id)
+        print(f"   Found {len(tests_in_run)} tests in run")
+        
+        # Build case_id → test_id mapping
+        test_id_map = {}
+        for test in tests_in_run:
+            test_id_map[test['case_id']] = test['id']
+        
         results_payload = []
         
         for result in test_results:
@@ -73,6 +72,11 @@ class TestRailRunner:
             
             if not case_id:
                 print(f"⚠️ Case ID not found for {automation_id}, skipping")
+                continue
+            
+            test_id = test_id_map.get(case_id)
+            if not test_id:
+                print(f"⚠️ Test ID not found for case {case_id}, skipping")
                 continue
             
             # Map status
@@ -84,7 +88,7 @@ class TestRailRunner:
                 status_id = 3
             
             result_payload = {
-                'case_id': case_id,
+                'test_id': test_id,
                 'status_id': status_id,
                 'comment': result.error_message or f"Test {result.status}",
             }

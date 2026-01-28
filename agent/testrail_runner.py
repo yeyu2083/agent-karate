@@ -96,8 +96,8 @@ class TestRailRunner:
                 status_id = 3
             
             result_payload = {
-                'test_id': test_id,
-                'status_id': status_id,
+                'test_id': int(test_id),
+                'status_id': int(status_id),
                 'comment': result.error_message or f"Test {result.status}",
             }
             
@@ -105,6 +105,10 @@ class TestRailRunner:
         
         # Batch submit
         if results_payload:
+            print(f"\n📤 Payload to send:")
+            for r in results_payload:
+                print(f"   {r}")
+            
             success = self.client.add_results_batch(run_id, results_payload)
             
             if success:

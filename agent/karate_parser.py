@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from .state import TestResult
 
 
@@ -16,7 +16,23 @@ class KarateParser:
                 print(f"No data found in Karate JSON file: {file_path}")
                 return results
             
-            # Intentar parsing normal primero (por scenarios individuales)
+            # Estructura 1: scenarioResults (nuevo formato detallado)
+            if isinstance(data, dict) and 'scenarioResults' in data:
+                print("✓ Detected detailed format with scenarioResults")
+                scenario_results = data.get('scenarioResults', [])
+                feature_name = data.get('name', 'Unknown Feature')
+                
+                if isinstance(scenario_results, list):
+                    for scenario in scenario_results:
+                        result = KarateParser._parse_scenario_result(scenario, feature_name)
+                        if result:
+                            results.append(result)
+                    
+                    if results:
+                        print(f"✓ Successfully parsed {len(results)} test results from scenarioResults")
+                        return results
+            
+            # Estructura 2: elementos (formato antiguo)
             features = []
             if isinstance(data, list):
                 features = data
@@ -25,60 +41,42 @@ class KarateParser:
                     features = [data]
                 elif 'features' in data:
                     features = data.get('features', [])
-                else:
-                    # Si no hay estructura normal, ver si es solo resumen
-                    if 'featureSummary' in data:
-                        print("⚠️ Solo hay resumen de features, usando fallback")
-                        # Usar resumen como fallback
-                        features = []
-                    else:
-                        print(f"Unexpected JSON structure. Keys: {list(data.keys())}")
-                        return results
             
             if features:
                 print(f"Found {len(features)} feature(s) in Karate JSON")
                 for feature in features:
                     results.extend(KarateParser._parse_feature_data(feature, ""))
-                print(f"Successfully parsed {len(results)} test results from scenarios")
-                return results
+                
+                if results:
+                    print(f"✓ Successfully parsed {len(results)} test results from features")
+                    return results
             
-            # Si no hay scenarios, usar featureSummary como fallback
+            # Fallback a resumen si no hay nada más
             if isinstance(data, dict) and 'featureSummary' in data:
                 print("Detected Karate summary format (fallback)")
                 feature_summary = data.get('featureSummary', [])
                 print(f"Feature summary has {len(feature_summary)} features")
                 
                 for feature_item in feature_summary:
-                    if isinstance(feature_item, dict):
-                        feature_name = feature_item.get('name', 'Unknown Feature')
-                        passed_count = feature_item.get('passedCount', 0)
-                        failed_count = feature_item.get('failedCount', 0)
-                        scenario_count = feature_item.get('scenarioCount', 0)
-                        duration = feature_item.get('durationMillis', 0) / 1000
-                        
-                        print(f"Processing feature: {feature_name}")
-                        print(f"  Passed: {passed_count}, Failed: {failed_count}, Total: {scenario_count}")
-                        
-                        if failed_count > 0:
-                            status = 'failed'
-                            error_msg = f"Failed scenarios: {failed_count}"
-                        else:
-                            status = 'passed'
-                            error_msg = None
-                        
-                        # Build scenario name with results summary
-                        scenario_summary = f"{passed_count}/{scenario_count} scenarios passed"
-                        
-                        results.append(TestResult(
-                            feature=feature_name,
-                            scenario=feature_name,  # Keep feature name as main identifier
-                            status=status,
-                            duration=duration,
-                            error_message=error_msg
-                        ))
+                    name = feature_item.get('name', 'Unknown')
+                    status = 'passed' if not feature_item.get('failed', False) else 'failed'
+                    duration = feature_item.get('durationMillis', 0) / 1000.0
+                    
+                    results.append(TestResult(
+                        feature=name,
+                        scenario=name,
+                        status=status,
+                        duration=duration,
+                        error_message=None,
+                        steps=[],
+                        gherkin_steps=[],
+                        background_steps=[],
+                        expected_assertions=[],
+                        examples=[]
+                    ))
                 
                 if results:
-                    print(f"Successfully parsed {len(results)} test results from feature summary")
+                    print(f"✓ Successfully parsed {len(results)} test results from feature summary")
                     return results
             
         except FileNotFoundError:
@@ -91,7 +89,94 @@ class KarateParser:
             traceback.print_exc()
         
         return results
-
+    
+    @staticmethod
+    def _parse_scenario_result(scenario: Dict, feature_name: str) -> Optional[TestResult]:
+        """Parse individual scenario from scenarioResults"""
+        try:
+            scenario_name = scenario.get('name', 'Unknown Scenario')
+            
+            # Status viene del campo 'failed' (booleano)
+            # failed=true → status='failed', failed=false → status='passed'
+            is_failed = scenario.get('failed', False)
+            status = 'failed' if is_failed else 'passed'
+            
+            duration_ms = scenario.get('durationMillis', 0)
+            duration = duration_ms / 1000.0
+            
+            error_message = None
+            steps_data = scenario.get('stepResults', [])
+            
+            # Extraer error si existe
+            if is_failed:
+                error_message = scenario.get('error', 'Test failed')
+            
+            # Extraer pasos del Gherkin
+            gherkin_steps = KarateParser._extract_gherkin_steps_from_result(scenario)
+            background_steps = []  # No disponible en este formato
+            expected_assertions = KarateParser._extract_expected_assertions_from_result(scenario)
+            examples = []
+            
+            return TestResult(
+                feature=feature_name,
+                scenario=scenario_name,
+                status=status,
+                duration=duration,
+                error_message=error_message,
+                steps=steps_data,
+                gherkin_steps=gherkin_steps,
+                background_steps=background_steps,
+                expected_assertions=expected_assertions,
+                examples=examples
+            )
+        except Exception as e:
+            print(f"⚠️ Error parsing scenario: {e}")
+            return None
+    
+    @staticmethod
+    def _extract_gherkin_steps_from_result(scenario: Dict) -> List[str]:
+        """Extraer pasos del scenario result"""
+        steps = []
+        try:
+            step_results = scenario.get('stepResults', [])
+            for step_result in step_results:
+                if isinstance(step_result, dict):
+                    step = step_result.get('step', {})
+                    if isinstance(step, dict):
+                        prefix = step.get('prefix', '').strip()  # Given, When, Then, And, *
+                        text = step.get('text', '').strip()
+                        
+                        # Mapear prefijos de Karate a Gherkin
+                        if prefix == '*':
+                            prefix = 'Given'  # O And, pero usamos Given como default
+                        
+                        if prefix and text:
+                            steps.append(f"{prefix} {text}")
+        except Exception:
+            pass
+        return steps
+    
+    @staticmethod
+    def _extract_expected_assertions_from_result(scenario: Dict) -> List[str]:
+        """Extraer aserciones de los pasos"""
+        assertions = []
+        try:
+            step_results = scenario.get('stepResults', [])
+            for step_result in step_results:
+                if isinstance(step_result, dict):
+                    step = step_result.get('step', {})
+                    if isinstance(step, dict):
+                        prefix = step.get('prefix', '').strip()
+                        text = step.get('text', '').strip()
+                        
+                        # Capturar Then y And como aserciones
+                        if any(kw in prefix for kw in ['Then', 'And', '*']) and text:
+                            if any(x in text for x in ['status', 'match', '==']):
+                                assertions.append(f"{prefix} {text}")
+        except Exception:
+            pass
+        return assertions
+    
     @staticmethod
     def _parse_feature_data(feature: Dict, source: str = "") -> List[TestResult]:
         results: List[TestResult] = []

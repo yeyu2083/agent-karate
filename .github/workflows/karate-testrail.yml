@@ -210,5 +210,6 @@ jobs:
             karate.json
             testrail-output.log
             testrail-run-data.json
+            test-report.html
             src/test/java/target/karate-reports/
           retention-days: 30

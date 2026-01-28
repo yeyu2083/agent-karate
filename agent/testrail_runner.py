@@ -67,7 +67,15 @@ class TestRailRunner:
         results_payload = []
         
         for result in test_results:
-            automation_id = f"{result.feature}.{result.scenario}"
+            # Match the same logic as sync_cases_from_karate
+            if result.feature == result.scenario:
+                # Fallback mode: feature summary only
+                automation_id = result.feature
+            else:
+                # Individual scenario mode
+                scenario_clean = result.scenario.split('.')[0] if '.' in result.scenario else result.scenario
+                automation_id = f"{result.feature}.{scenario_clean}"
+            
             case_id = case_id_map.get(automation_id)
             
             if not case_id:
@@ -153,6 +161,10 @@ class TestRailRunner:
         else:
             status_emoji = "⚠️"
         
+        # Calculate percentages safely
+        failed_rate = (failed/total*100) if total > 0 else 0
+        skipped_rate = (skipped/total*100) if total > 0 else 0
+        
         report = f"""{status_emoji} **TestRail Run #{run['id']}** - {run['name']}
 
 ### 📊 Results Summary
@@ -160,8 +172,8 @@ class TestRailRunner:
 |--------|-------|------|
 | Total | {total} | 100% |
 | ✅ Passed | {passed} | {pass_rate:.1f}% |
-| ❌ Failed | {failed} | {(failed/total*100):.1f}% if {total} > 0 else 0 |
-| ⏭️ Skipped | {skipped} | {(skipped/total*100):.1f}% if {total} > 0 else 0 |
+| ❌ Failed | {failed} | {failed_rate:.1f}% |
+| ⏭️ Skipped | {skipped} | {skipped_rate:.1f}% |
 
 ### 🔗 Links
 - [View in TestRail]({self.client.settings.testrail_url}/index.php?/runs/view/{run['id']})

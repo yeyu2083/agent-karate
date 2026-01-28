@@ -9,6 +9,10 @@ class TestResult(BaseModel):
     duration: float
     error_message: Optional[str] = None
     steps: List[dict] = Field(default_factory=list)
+    gherkin_steps: List[str] = Field(default_factory=list)  # Pasos del .feature (Given/When/Then)
+    background_steps: List[str] = Field(default_factory=list)  # Pasos del Background
+    expected_assertions: List[str] = Field(default_factory=list)  # Match statements (Then/And match)
+    examples: List[dict] = Field(default_factory=list)  # Datos de Examples si es Scenario Outline
 
 
 class TestRailRunState(TypedDict):
@@ -23,20 +27,12 @@ class AgentState(TypedDict):
     # === Karate/Test Results ===
     karate_results: List[TestResult]
     
-    # === Jira Integration (Legacy/Optional) ===
-    jira_ticket_id: Optional[str]
-    jira_response: Optional[dict]
-    parent_issue: Optional[str]
-    
-    # === TestRail Integration (NEW) ===
+    # === TestRail Integration ===
     testrail_run: Optional[TestRailRunState]
     testrail_sync_status: str  # "PENDING", "IN_PROGRESS", "SUCCESS", "FAILED"
     testrail_report: Optional[str]
     testrail_error: Optional[str]
     
     # === Workflow State ===
-    xray_import_payload: Optional[dict]  # Legacy
     final_output: str
     current_step: str
-    test_plan: Optional[str]  # Legacy
-    test_execution: Optional[str]  # Legacy

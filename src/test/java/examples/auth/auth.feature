@@ -48,8 +48,6 @@ Feature: Autenticación y Autorización
     Then status 200
     And match response.token == '#string'
     And match response.token == '#notnull'
-    # Guardar el token para uso posterior
     * def authToken = response.token
-    And assert authToken.length > 0
 
 

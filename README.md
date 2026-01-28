@@ -484,6 +484,148 @@ COMMIT_MESSAGE   = mensaje del commit
 JIRA_PARENT_ISSUE = extraído del nombre de rama (e.g., SCRUM-4)
 ```
 
+---
+
+## 🤖 AI Feedback en Pipeline (Enero 2026)
+
+### ¿Qué es?
+
+El agente genera **análisis inteligente de resultados** usando LLM durante la ejecución del pipeline.
+
+### 📊 Tipos de Feedback
+
+**1. Resumen Analítico**
+```
+Pass Rate: 87.5% (7/8 tests)
+Critical Failures: 0
+High-Risk Tests: 1 (auth_negative_invalid_email)
+Performance Issues: 0
+
+✅ Strengths:
+- Authentication workflow is rock-solid (100% pass)
+- Post creation tests are consistent
+
+⚠️ Areas of Concern:
+- User deletion test needs optimization (3.2s)
+```
+
+**2. Análisis de Fallos**
+```
+Root Cause Analysis:
+- auth_negative_missing_password: Returns 401 instead of 400
+  → Suggestion: API validation should return 400 for missing fields
+  
+- post_update_invalid_id: Database timeout
+  → Suggestion: Add connection pooling or increase timeout to 5s
+```
+
+**3. Recomendaciones de Performance**
+```
+🚀 Optimization Opportunities:
+- users_list endpoint: 4.1s → Target: < 2s
+  Consider: Add caching, pagination, or query optimization
+  
+- posts_create endpoint: 1.8s → Good, but watch for regression
+```
+
+### 🔧 Configuración
+
+En GitHub Actions (`.github/workflows/karate-testrail.yml`):
+
+```yaml
+- name: Run Tests & Generate AI Feedback
+  env:
+    LLM_PROVIDER: glm  # o openai, azure, anthropic, google, ollama
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}  # si usas openai
+    TESTRAIL_URL: ${{ secrets.TESTRAIL_URL }}
+    TESTRAIL_EMAIL: ${{ secrets.TESTRAIL_EMAIL }}
+    TESTRAIL_API_KEY: ${{ secrets.TESTRAIL_API_KEY }}
+  run: |
+    mvn test
+    python -m agent.main
+```
+
+### 📍 Proveedores LLM Soportados
+
+| Proveedor | Requisito | Mejor para |
+|-----------|-----------|-----------|
+| `glm` | API key de Zhipu | Rápido, económico (defecto) |
+| `openai` | OpenAI API key | Mejor calidad análisis |
+| `azure` | Azure OpenAI credentials | Empresas Azure |
+| `anthropic` | Claude API key | Análisis profundo |
+| `google` | Google Gemini API key | Flexible, multimodal |
+| `ollama` | Ollama local (localhost:11434) | Privado, sin internet |
+
+### 🛠️ Configuración Local
+
+```bash
+# 1. Instalar dependencias
+pip install -r agent/requirements.txt
+
+# 2. Exportar API key (ej: OpenAI)
+export OPENAI_API_KEY=sk-xxx...
+
+# 3. Ejecutar con feedback
+export LLM_PROVIDER=openai
+python agent/main.py
+```
+
+### 📋 Salida en Pipeline
+
+El feedback aparece en:
+1. **Logs de GitHub Actions**: Visible en tab "Run Tests"
+2. **Artifact**: Archivo `testrail-run-data.json` con feedback incluido
+3. **PR Comment**: Resumen ejecutivo del feedback (próxima versión)
+
+### 🎯 Ejemplo Real
+
+Salida en logs durante ejecución:
+```
+============================================================
+🤖 AI FEEDBACK & INSIGHTS
+============================================================
+
+📊 TEST RESULTS SUMMARY
+Pass Rate: 87.5% (7 of 8 tests)
+Execution Time: 12.4s
+Environment: dev
+
+✅ Test Results Analysis:
+- Critical passes: authentication workflow (100%)
+- Moderate concerns: 1 failure in user deletion flow
+- Performance: 2 tests above baseline (>2s)
+
+🔍 FAILURE ROOT CAUSE ANALYSIS
+Test: user_delete_invalid_id
+Expected: 404 Not Found
+Actual: 500 Internal Server Error
+Root Cause Hypothesis:
+  The user deletion endpoint throws a 500 when given an invalid
+  integer ID format. Expected behavior should be 404.
+
+Recommendation:
+  Add input validation to convert invalid IDs to 404 before database query
+
+🚀 PERFORMANCE OPTIMIZATION OPPORTUNITIES
+1. GET /users list endpoint: 3.8s (target: 2s)
+   - Consider: Add pagination query params, use cursor-based pagination
+   - Expected improvement: 1.5-2x speedup
+
+2. POST /posts endpoint: 2.1s (target: 1.5s)
+   - Consider: Batch inserts or async processing
+   - Expected improvement: 30-40% faster
+
+============================================================
+✅ Run #42
+============================================================
+```
+
+### 💡 Mejor Práctica
+
+1. **En desarrollo**: Usar `glm` o `ollama` (rápido, gratis/local)
+2. **En CI/CD**: Usar `openai` o `anthropic` (mejor calidad)
+3. **En producción**: Usar `azure` (control empresarial) o `ollama` (privado)
+
 ### 🎯 Siguiente: Analytics y Notificaciones
 
 Próximas features plaaneadas:
@@ -492,6 +634,7 @@ Próximas features plaaneadas:
 - 🚨 Alertas por tasa de fallos
 - 📈 Detección de tests flaky
 - 🏆 Tracking de cobertura
+- 💬 AI Feedback en PR comments
 
 ---
 

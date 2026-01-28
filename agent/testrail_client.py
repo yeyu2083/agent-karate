@@ -17,15 +17,14 @@ class TestRailSettings(BaseSettings):
     testrail_project_id: int
     testrail_suite_id: int = 1
     
+    model_config = {"env_file": ".env", "extra": "ignore"}
+    
     def __init__(self, **data):
         super().__init__(**data)
         # Clean up URL (remove whitespace/newlines from secrets)
         self.testrail_url = self.testrail_url.strip()
         self.testrail_email = self.testrail_email.strip()
         self.testrail_api_key = self.testrail_api_key.strip()
-    
-    class Config:
-        env_file = ".env"
 
 
 class TestRailClient:

@@ -42,7 +42,7 @@ Feature: API de Posts - Pruebas de Publicaciones
     And match response == '#array'
     And match response[0] == { userId: '#number', id: '#number', title: '#string', body: '#string' }
     And match response.length >= 100
-    And assert response.length == 100
+    And match response.length == 100
 
   @post @create
   Scenario Outline: Crear nuevos posts

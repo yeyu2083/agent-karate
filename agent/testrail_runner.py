@@ -86,8 +86,7 @@ class TestRailRunner:
             result_payload = {
                 'case_id': case_id,
                 'status_id': status_id,
-                'elapsed': f"{result.duration:.2f}s",
-                'comment': result.error_message or "Test passed",
+                'comment': result.error_message or f"Test {result.status}",
             }
             
             results_payload.append(result_payload)

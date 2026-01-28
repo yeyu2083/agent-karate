@@ -272,6 +272,8 @@ class TestRailClient:
         url = f"{self.base_url}/add_results/{run_id}"
         try:
             payload = {"results": results}
+            print(f"   DEBUG: Sending batch results to {url}")
+            print(f"   DEBUG: Payload = {json.dumps(payload, indent=2)}")
             response = requests.post(
                 url,
                 auth=self.auth,
@@ -282,6 +284,7 @@ class TestRailClient:
             return True
         except Exception as e:
             print(f"❌ Error adding batch results: {e}")
+            print(f"   Response: {response.text if 'response' in locals() else 'N/A'}")
             return False
     
     def get_results_for_run(self, run_id: int) -> List[Dict[str, Any]]:
@@ -290,9 +293,17 @@ class TestRailClient:
         try:
             response = requests.get(url, auth=self.auth, headers=self.headers)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            # TestRail API v2 wraps results in a dict with 'results' key
+            if isinstance(data, dict) and 'results' in data:
+                return data['results']
+            # Fallback
+            if isinstance(data, dict):
+                return list(data.values())
+            return data if isinstance(data, list) else []
         except Exception as e:
             print(f"❌ Error getting results for run {run_id}: {e}")
+            return []
             return []
     
     def get_results_for_case(self, run_id: int, case_id: int) -> List[Dict[str, Any]]:

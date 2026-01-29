@@ -209,7 +209,10 @@ class KarateParser:
             
             # Extraer pasos del Gherkin
             gherkin_steps = KarateParser._extract_gherkin_steps_from_result(scenario)
-            background_steps = []  # No disponible en este formato
+            
+            # ✅ Extraer Background steps de stepResults
+            background_steps = KarateParser._extract_background_steps(scenario)
+            
             prerequisites = []  # No disponible en este formato
             expected_assertions = KarateParser._extract_expected_assertions_from_result(scenario)
             examples = []
@@ -393,39 +396,45 @@ class KarateParser:
         return steps
     
     @staticmethod
-    def _extract_background_steps(feature: Dict) -> List[str]:
-        """Extraer pasos del Background de la feature"""
+    def _extract_background_steps(scenario: Dict) -> List[str]:
+        """Extraer pasos del Background del scenario JSON de Karate"""
         steps = []
         
-        # Primero intentar obtener del cache (de archivos .feature en bruto)
-        feature_name = feature.get('name', '')
-        if feature_name:
-            feature_lower = feature_name.lower()
-            
-            # Palabras clave que sabemos que existen en el cache
-            for keyword in ['posts', 'auth', 'users']:
-                if keyword in feature_lower:
-                    cached = KarateParser.get_background_for_feature(keyword)
-                    if cached:
-                        print(f"✓ Background encontrado en cache: {keyword}")
-                        return cached
-            
-            # Debug
-            print(f"⚠️ Background NO encontrado para '{feature_name}'. Cache: {list(KarateParser._feature_backgrounds_cache.keys())}")
-        
-        # Si no está en cache, extraer del JSON
         try:
-            background = feature.get('background')
-            if background and isinstance(background, dict):
-                background_steps = background.get('steps', [])
-                for step in background_steps:
-                    if isinstance(step, dict):
-                        keyword = step.get('keyword', '').strip()  # Given, And, etc
-                        text = step.get('text', '').strip()
-                        if keyword and text:
-                            steps.append(f"{keyword} {text}")
+            # Los pasos del Background están en stepResults con "background": true
+            step_results = scenario.get('stepResults', [])
+            if isinstance(step_results, list):
+                for step_result in step_results:
+                    if isinstance(step_result, dict):
+                        step_info = step_result.get('step', {})
+                        if isinstance(step_info, dict) and step_info.get('background'):
+                            prefix = step_info.get('prefix', '').strip()  # * en Karate
+                            text = step_info.get('text', '').strip()
+                            if prefix and text:
+                                # Formatear: "* url baseUrl" o "* header ..."
+                                steps.append(f"{prefix} {text}")
+                
+                if steps:
+                    print(f"✓ Background extraído de stepResults: {len(steps)} steps")
+                    for step in steps:
+                        print(f"    - {step}")
+            
+            # Fallback: si no hay pasos con background=true, intentar obtener del objeto background
+            if not steps:
+                background = scenario.get('background')
+                if background and isinstance(background, dict):
+                    background_steps = background.get('steps', [])
+                    if isinstance(background_steps, list):
+                        for step in background_steps:
+                            if isinstance(step, dict):
+                                keyword = step.get('keyword', '').strip()
+                                text = step.get('text', '').strip()
+                                if keyword and text:
+                                    steps.append(f"{keyword} {text}")
+        
         except Exception as e:
-            pass
+            print(f"Error extrayendo background: {e}")
+        
         return steps
     
     @staticmethod

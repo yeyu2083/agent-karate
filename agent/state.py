@@ -1,7 +1,6 @@
 from typing import TypedDict, List, Any, Optional
 from pydantic import BaseModel, Field
 
-
 class TestResult(BaseModel):
     feature: str
     scenario: str
@@ -9,30 +8,22 @@ class TestResult(BaseModel):
     duration: float
     error_message: Optional[str] = None
     steps: List[dict] = Field(default_factory=list)
-    gherkin_steps: List[str] = Field(default_factory=list)  # Pasos del .feature (Given/When/Then)
-    background_steps: List[str] = Field(default_factory=list)  # Pasos del Background
-    expected_assertions: List[str] = Field(default_factory=list)  # Match statements (Then/And match)
-    examples: List[dict] = Field(default_factory=list)  # Datos de Examples si es Scenario Outline
-
+    gherkin_steps: List[str] = Field(default_factory=list)
+    background_steps: List[str] = Field(default_factory=list)
+    expected_assertions: List[str] = Field(default_factory=list)
+    examples: List[dict] = Field(default_factory=list)
 
 class TestRailRunState(TypedDict):
-    """TestRail run execution state"""
     run_id: Optional[int]
-    case_id_map: dict  # {automation_id: case_id}
+    case_id_map: dict 
     results_submitted: int
     errors: List[str]
 
-
 class AgentState(TypedDict):
-    # === Karate/Test Results ===
     karate_results: List[TestResult]
-    
-    # === TestRail Integration ===
     testrail_run: Optional[TestRailRunState]
-    testrail_sync_status: str  # "PENDING", "IN_PROGRESS", "SUCCESS", "FAILED"
+    testrail_sync_status: str
     testrail_report: Optional[str]
     testrail_error: Optional[str]
-    
-    # === Workflow State ===
     final_output: str
     current_step: str

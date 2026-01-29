@@ -2,12 +2,8 @@ Feature: API de Posts - Pruebas de Publicaciones
   Testing del API de posts con validaciones y operaciones CRUD
 
   Background:
-    # Precondiciones globales aplicadas a todos los escenarios
-    * url baseUrl                                              # https://jsonplaceholder.typicode.com
-    * header Content-Type = 'application/json'                # Content-Type requerido
-    # Prerequisitos: API endpoint es accesible y respondiendo
-    # Prerequisito: Test environment esta correctamente configurado
-    # Prerequisito: Datos de prueba estan disponibles
+    * url baseUrl
+    * header Content-Type = 'application/json'
 
   @smoke @get
   Scenario Outline: Obtener posts por ID

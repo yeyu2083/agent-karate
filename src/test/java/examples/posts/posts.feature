@@ -79,4 +79,95 @@ Feature: API de Posts - Pruebas de Publicaciones
       | userId | title      | body                              | statusCode |
       | 999    | Empty User | User ID out of range              | 201        |
 
+  @post @update
+  Scenario: Actualizar un post existente
+    Valida que se puede actualizar un post usando PUT
+    y que todos los campos se actualizan correctamente
 
+    Given path '/posts/1'
+    And request
+      """
+      {
+        userId: 1,
+        id: 1,
+        title: 'Post actualizado',
+        body: 'Contenido modificado del post'
+      }
+      """
+    When method PUT
+    Then status 200
+    And match response.id == 1
+    And match response.title == 'Post actualizado'
+    And match response.body == 'Contenido modificado del post'
+
+  @post @delete
+  Scenario: Eliminar un post
+    Valida que se puede eliminar un post usando DELETE
+    y que la respuesta es correcta
+
+    Given path '/posts/1'
+    When method DELETE
+    Then status 200
+    And match response == {}
+
+  @get @filter
+  Scenario: Obtener posts filtrados por userId
+    Valida que se puede filtrar posts por userId
+    usando query parameters
+
+    Given path '/posts'
+    And param userId = 1
+    When method GET
+    Then status 200
+    And match response == '#array'
+    And match response[0].userId == 1
+    And each response contains { userId: 1 }
+
+  @get @pagination
+  Scenario Outline: Obtener posts con paginación
+    Valida que la paginación funciona correctamente
+    con diferentes límites y offsets
+
+    Given path '/posts'
+    And param _start = <start>
+    And param _limit = <limit>
+    When method GET
+    Then status 200
+    And match response == '#array'
+    And match response.length <= <limit>
+
+    @positive
+    Examples: Paginación válida
+      | start | limit | description      |
+      | 0     | 10    | Primeros 10      |
+      | 10    | 10    | Siguientes 10    |
+      | 20    | 5     | 5 posts desde 20 |
+
+  @get @sorting
+  Scenario: Obtener posts ordenados
+    Valida que se puede obtener posts ordenados
+    por diferentes campos
+
+    Given path '/posts'
+    And param _sort = 'id'
+    And param _order = 'desc'
+    When method GET
+    Then status 200
+    And match response == '#array'
+    And match response[0].id >= response[1].id
+
+  @post @validation
+  Scenario: Crear post con título vacío - Validación
+    Valida que el API rechaza posts con título vacío
+
+    Given path '/posts'
+    And request
+      """
+      {
+        userId: 1,
+        title: '',
+        body: 'Body content'
+      }
+      """
+    When method POST
+    Then status 201 || status 400

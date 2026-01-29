@@ -381,18 +381,22 @@ class KarateParser:
             # 1. Nombre exacto
             cached = KarateParser.get_background_for_feature(feature_name)
             if cached:
-                print(f"✓ Background encontrado para: {feature_name}")
+                print(f"✓ Background encontrado en cache para: {feature_name}")
                 return cached
             
             # 2. Usar la primera palabra del nombre de feature (ej: "API de Posts..." → "posts")
             # Extraer última palabra antes de "Pruebas" o similar
             words = feature_name.lower().split()
             for word in reversed(words):
-                if word and word not in ['de', 'api', 'testing', 'pruebas', 'completo', 'para']:
+                if word and word not in ['de', 'api', 'testing', 'pruebas', 'completo', 'para', 'autenticación', 'autorización', 'usuarios', 'publicaciones']:
                     cached = KarateParser.get_background_for_feature(word)
                     if cached:
-                        print(f"✓ Background encontrado para: {word} (from {feature_name})")
+                        print(f"✓ Background encontrado en cache para: {word} (from {feature_name})")
                         return cached
+            
+            # 3. Si no encontramos nada, listar el cache para debug
+            print(f"⚠️ Background NO encontrado en cache para: {feature_name}")
+            print(f"   Cache disponible: {list(KarateParser._feature_backgrounds_cache.keys())}")
         
         # Si no está en cache, extraer del JSON
         try:
@@ -405,8 +409,14 @@ class KarateParser:
                         text = step.get('text', '').strip()
                         if keyword and text:
                             steps.append(f"{keyword} {text}")
+                
+                if steps:
+                    print(f"✓ Background extraído del JSON: {len(steps)} pasos")
+                    return steps
         except Exception as e:
-            pass
+            print(f"Error extrayendo background del JSON: {e}")
+        
+        print(f"⚠️ No se encontró Background para: {feature_name}")
         return steps
     
     @staticmethod

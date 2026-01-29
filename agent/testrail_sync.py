@@ -263,14 +263,12 @@ class TestRailSync:
         if result.background_steps:
             md += self.md.header("🔧 Prerequisites", level=4)
             for i, step in enumerate(result.background_steps, 1):
-                formatted = self._format_step_with_icon(step)
-                md += self.md.numbered_item(formatted, i)
+                # Mostrar exactamente como está en el código
+                md += self.md.numbered_item(step, i)
         else:
-            # Default preconditions
+            # IMPORTANTE: No usar fallback genérico - esto ayuda a identificar problemas
             md += self.md.header("🔧 Prerequisites", level=4)
-            md += self.md.numbered_item("🌐 API endpoint is accessible and responding", 1)
-            md += self.md.numbered_item("⚙️ Test environment is properly configured", 2)
-            md += self.md.numbered_item("📦 Required test data is available", 3)
+            md += self.md.blockquote("ℹ️ Background/Prerequisites not extracted from feature file")
         
         return md
     

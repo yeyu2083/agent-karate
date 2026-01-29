@@ -39,7 +39,7 @@ class KarateParser:
     
     @staticmethod
     def _extract_background_from_file(file_path: str) -> List[str]:
-        """Extraer Background directamente del archivo .feature"""
+        """Extraer Background directamente del archivo .feature - EXACTO COMO APARECE"""
         background_steps = []
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -56,18 +56,11 @@ class KarateParser:
             if background_match:
                 background_section = background_match.group(1)
                 
-                # Extraer pasos (líneas que empiezan con * o espacios + *)
+                # Extraer pasos manteniendo el formato exacto
                 for line in background_section.split('\n'):
-                    line = line.strip()
-                    # Detectar pasos del Karate (*, Given, When, Then, And)
-                    if line and (line.startswith('*') or 
-                                line.startswith('Given') or 
-                                line.startswith('When') or 
-                                line.startswith('Then') or 
-                                line.startswith('And')):
-                        # Limpiar la línea
-                        if line.startswith('*'):
-                            line = 'And ' + line[1:].lstrip()
+                    # Detectar pasos del Karate (líneas que empiezan con *)
+                    if line.strip() and line.strip().startswith('*'):
+                        # Mantener el formato exacto: "* url baseUrl" o "* header ..."
                         background_steps.append(line.strip())
         
         except Exception as e:
@@ -384,9 +377,22 @@ class KarateParser:
         # Primero intentar obtener del cache (de archivos .feature en bruto)
         feature_name = feature.get('name', '')
         if feature_name:
-            cached_background = KarateParser.get_background_for_feature(feature_name.replace(' - ', '').split('.')[0].strip())
-            if cached_background:
-                return cached_background
+            # Intentar diferentes variaciones del nombre
+            # 1. Nombre exacto
+            cached = KarateParser.get_background_for_feature(feature_name)
+            if cached:
+                print(f"✓ Background encontrado para: {feature_name}")
+                return cached
+            
+            # 2. Usar la primera palabra del nombre de feature (ej: "API de Posts..." → "posts")
+            # Extraer última palabra antes de "Pruebas" o similar
+            words = feature_name.lower().split()
+            for word in reversed(words):
+                if word and word not in ['de', 'api', 'testing', 'pruebas', 'completo', 'para']:
+                    cached = KarateParser.get_background_for_feature(word)
+                    if cached:
+                        print(f"✓ Background encontrado para: {word} (from {feature_name})")
+                        return cached
         
         # Si no está en cache, extraer del JSON
         try:

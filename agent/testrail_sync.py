@@ -189,6 +189,10 @@ class TestRailSync:
             'custom_status_actual': result.status,
         }
         
+        # Debug: mostrar payload
+        print(f"📋 Payload para caso: {automation_id}")
+        print(f"   custom_preconds valor: {preconditions[:100]}...")
+        
         # NO incluir estimate - TestRail es muy quisquilloso con este campo
         
         return case_data

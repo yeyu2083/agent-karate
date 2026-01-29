@@ -1,7 +1,7 @@
 # testrail_sync.py
 """
-TestRail Synchronization - IMPROVED VERSION
-Sync Karate test cases to TestRail with enhanced Markdown formatting
+TestRail Synchronization - ENHANCED VERSION v2
+Sync Karate test cases to TestRail with premium visual formatting
 """
 
 from typing import Optional, List
@@ -11,11 +11,12 @@ from .state import TestResult
 
 
 class StepType(Enum):
-    """Tipos de pasos Gherkin con mejor visualización"""
-    GIVEN = ("Given", "🎯", "Precondition")
+    """Tipos de pasos Gherkin con iconos visuales"""
+    GIVEN = ("Given", "🎯", "Setup")
     WHEN = ("When", "⚡", "Action")
     THEN = ("Then", "✅", "Validation")
     AND = ("And", "➕", "Additional")
+    MATCH = ("match", "🔍", "Assertion")
     
     def __init__(self, keyword: str, icon: str, label: str):
         self.keyword = keyword
@@ -26,7 +27,7 @@ class StepType(Enum):
 class MarkdownFormatter:
     """
     Utility class for creating clean, professional Markdown for TestRail
-    TestRail soporta Markdown pero es limitado - esta clase optimiza para eso.
+    Optimizado para el renderizado específico de TestRail
     """
     
     @staticmethod
@@ -82,20 +83,12 @@ class MarkdownFormatter:
         return header + separator
     
     @staticmethod
-    def badge(text: str, emoji: str = "") -> str:
-        """Create visual badge with emoji"""
-        if emoji:
-            return f"{emoji} **{text}**"
-        return f"**{text}**"
-    
-    @staticmethod
     def status_badge(status: str) -> str:
         """Create status-specific badge"""
         badges = {
             'passed': '✅ **PASSED**',
             'failed': '❌ **FAILED**',
             'skipped': '⏭️ **SKIPPED**',
-            'pending': '⏳ **PENDING**'
         }
         return badges.get(status.lower(), f'❓ **{status.upper()}**')
 
@@ -197,44 +190,56 @@ class TestRailSync:
         }
         
         # NO incluir estimate - TestRail es muy quisquilloso con este campo
-        # Si lo necesitás, tenés que configurarlo manualmente en TestRail
         
         return case_data
     
     # ============================================================================
-    # FORMATTING METHODS - Aquí está la magia ✨
+    # FORMATTING METHODS - ENHANCED VERSION
     # ============================================================================
     
     def _build_description(self, result: TestResult) -> str:
         """
-        Build main description with clean, scannable layout
+        Build main description with enhanced visual hierarchy
         """
         md = ""
         
-        # Header with feature info
+        # Header con emoji y feature
         md += self.md.header(f"🧪 {result.feature}", level=2)
         md += self.md.blockquote(f"**Scenario:** {result.scenario}")
         md += "\n"
         
-        # Quick stats table - muy visual
-        if result.duration or result.status:
-            md += self.md.header("📊 Quick Stats", level=3)
-            
-            # Table format
-            headers = ["Metric", "Value"]
-            md += self.md.table_header(*headers)
-            
-            if result.status:
-                md += self.md.table_row("Status", self.md.status_badge(result.status))
-            
-            if result.duration:
-                duration_str = f"⏱️ {result.duration:.2f}s"
-                md += self.md.table_row("Duration", duration_str)
-            
-            if result.examples:
-                md += self.md.table_row("Examples", f"📋 {len(result.examples)} scenarios")
-            
-            md += "\n"
+        # Stats table con más info y mejor formato
+        md += self.md.header("📊 Test Metrics", level=3)
+        
+        headers = ["Metric", "Value"]
+        md += self.md.table_header(*headers)
+        
+        # Status con emoji grande
+        status_display = self.md.status_badge(result.status)
+        md += self.md.table_row("Status", status_display)
+        
+        # Duration si existe
+        if result.duration:
+            duration_display = f"⏱️ **{result.duration:.3f}s**"
+            md += self.md.table_row("Execution Time", duration_display)
+        
+        # Steps ejecutados
+        if result.steps:
+            md += self.md.table_row("Steps Executed", f"🔢 **{len(result.steps)}**")
+        
+        # Gherkin steps count
+        if result.gherkin_steps:
+            md += self.md.table_row("Gherkin Steps", f"📝 **{len(result.gherkin_steps)}**")
+        
+        # Assertions count
+        if result.expected_assertions:
+            md += self.md.table_row("Assertions", f"🔍 **{len(result.expected_assertions)}**")
+        
+        # Examples si hay Scenario Outline
+        if result.examples:
+            md += self.md.table_row("Test Scenarios", f"📋 **{len(result.examples)}**")
+        
+        md += "\n"
         
         # Background steps si existen
         if result.background_steps:
@@ -247,125 +252,135 @@ class TestRailSync:
     
     def _build_preconditions(self, result: TestResult) -> str:
         """
-        Build preconditions - limpio y claro
+        Build preconditions - clean and professional
         """
         md = ""
         
         if result.background_steps:
-            md += self.md.header("Prerequisites", level=4)
+            md += self.md.header("🔧 Prerequisites", level=4)
             for i, step in enumerate(result.background_steps, 1):
-                md += self.md.numbered_item(self._format_step(step), i)
+                formatted = self._format_step_with_icon(step)
+                md += self.md.numbered_item(formatted, i)
         else:
             # Default preconditions
-            md += self.md.header("Prerequisites", level=4)
-            md += self.md.list_item("API endpoint is accessible")
-            md += self.md.list_item("Test environment is configured")
-            md += self.md.list_item("Required test data is available")
+            md += self.md.header("🔧 Prerequisites", level=4)
+            md += self.md.numbered_item("🌐 API endpoint is accessible and responding", 1)
+            md += self.md.numbered_item("⚙️ Test environment is properly configured", 2)
+            md += self.md.numbered_item("📦 Required test data is available", 3)
         
         return md
     
     def _build_steps(self, result: TestResult) -> str:
         """
-        Build test steps with clear structure and icons
+        Build test steps with icons and better organization
         """
         md = ""
         
         if result.gherkin_steps:
-            md += self.md.header("Test Steps", level=4)
+            md += self.md.header("📋 Test Steps", level=4)
             
             for i, step in enumerate(result.gherkin_steps, 1):
-                # Detectar tipo de paso y añadir icono
-                step_type = self._detect_step_type(step)
-                icon = step_type.icon if step_type else "▪️"
-                
-                formatted_step = self._format_step(step)
-                md += self.md.numbered_item(f"{icon} {formatted_step}", i)
+                # Formatear con icono apropiado
+                formatted = self._format_step_with_icon(step)
+                md += self.md.numbered_item(formatted, i)
             
-            # Si hay examples, mostrarlos en tabla
+            # Si hay examples, mostrarlos en tabla mejorada
             if result.examples:
                 md += "\n"
-                md += self.md.header("📋 Test Data (Examples)", level=5)
+                md += self.md.horizontal_rule()
+                md += self.md.header("📊 Test Data Matrix (Scenario Outline)", level=4)
                 
                 if result.examples:
-                    # Usar las keys del primer example como headers
                     first_example = result.examples[0]
                     headers = list(first_example.keys())
                     
-                    md += self.md.table_header(*headers)
+                    # Headers con emojis
+                    emoji_headers = [f"📌 {h.upper()}" for h in headers]
+                    md += self.md.table_header(*emoji_headers)
                     
-                    for example in result.examples[:5]:  # Limitar a 5 para no saturar
-                        values = [str(example.get(h, '')) for h in headers]
+                    # Limitar a 10 rows para no saturar
+                    for example in result.examples[:10]:
+                        values = [f"`{example.get(h, '')}`" for h in headers]
                         md += self.md.table_row(*values)
                     
-                    if len(result.examples) > 5:
-                        md += f"\n*...and {len(result.examples) - 5} more examples*\n"
+                    if len(result.examples) > 10:
+                        md += f"\n> *...and {len(result.examples) - 10} more test scenarios*\n"
         else:
-            # Fallback steps
-            md += self.md.header("Test Steps", level=4)
-            md += self.md.numbered_item("🎯 Prepare test data", 1)
-            md += self.md.numbered_item("⚡ Execute API request", 2)
-            md += self.md.numbered_item("✅ Verify response status", 3)
-            md += self.md.numbered_item("✅ Validate response body", 4)
+            # Fallback steps con mejor formato
+            md += self.md.header("📋 Test Steps", level=4)
+            md += self.md.numbered_item("🎯 **Setup** - Prepare test data and environment", 1)
+            md += self.md.numbered_item("⚡ **Execute** - Send API request with test payload", 2)
+            md += self.md.numbered_item("✅ **Verify** - Check HTTP response status code", 3)
+            md += self.md.numbered_item("✅ **Validate** - Assert response body structure and values", 4)
         
         return md
     
     def _build_expected_result(self, result: TestResult) -> str:
         """
-        Build expected results - MUY visual y fácil de leer
+        Build expected results - SUPER visual y organizado
         """
         md = ""
         
-        # Status banner grande
+        # Status banner con separadores
         md += self.md.horizontal_rule()
-        md += self.md.header(self.md.status_badge(result.status), level=3)
+        md += self.md.header(self.md.status_badge(result.status), level=2)
         md += self.md.horizontal_rule()
         
-        # Assertions/Validations
+        # Validations con mejor formato
         if result.expected_assertions:
-            md += self.md.header("🔍 Validations", level=4)
+            md += self.md.header("🔍 Validations", level=3)
+            
+            # Tabla de validaciones en lugar de lista
+            md += self.md.table_header("✓", "Assertion", "Status")
             
             for i, assertion in enumerate(result.expected_assertions, 1):
                 clean_assertion = self._clean_assertion(assertion)
                 
-                # Diferentes iconos para variedad visual
-                icons = ['✓', '✔️', '☑️', '✅']
-                icon = icons[i % len(icons)]
+                # Status icon basado en el resultado general
+                status_icon = "✅" if result.status == "passed" else "❌"
                 
-                md += self.md.list_item(f"{icon} {clean_assertion}")
+                md += self.md.table_row(
+                    f"**{i}**",
+                    clean_assertion,
+                    status_icon
+                )
             
             md += "\n"
         
-        # Error details si falló
+        # Error details si falló - formato mejorado
         if result.error_message:
-            md += self.md.header("🔴 Error Details", level=4)
-            md += self.md.blockquote("The test failed with the following error:")
+            md += self.md.header("🔴 Error Details", level=3)
+            md += self.md.blockquote("⚠️ **The test failed with the following error:**")
+            md += "\n"
+            
+            # Code block con el error
             md += self.md.code_block(result.error_message, "")
             md += "\n"
         
-        # Footer con metadata
-        md += self._build_metadata_footer(result)
-        
-        return md
-    
-    def _build_metadata_footer(self, result: TestResult) -> str:
-        """
-        Build metadata footer con info relevante
-        """
-        md = ""
+        # Metadata footer con tabla
         md += self.md.horizontal_rule()
-        md += self.md.header("📌 Test Metadata", level=5)
+        md += self.md.header("📌 Test Metadata", level=4)
         
-        metadata = []
-        metadata.append(f"**Feature:** {self.md.code_inline(result.feature)}")
-        metadata.append(f"**Status:** {self.md.status_badge(result.status)}")
+        # Tabla de metadata
+        md += self.md.table_header("Property", "Value")
+        
+        md += self.md.table_row("**Feature**", self.md.code_inline(result.feature))
+        md += self.md.table_row("**Status**", self.md.status_badge(result.status))
         
         if result.duration:
-            metadata.append(f"**Duration:** ⏱️ {result.duration:.2f}s")
+            md += self.md.table_row("**Duration**", f"⏱️ {result.duration:.3f}s")
         
         if result.steps:
-            metadata.append(f"**Steps Executed:** {len(result.steps)}")
+            md += self.md.table_row("**Steps Executed**", f"🔢 {len(result.steps)}")
         
-        md += " | ".join(metadata)
+        if result.gherkin_steps:
+            md += self.md.table_row("**Gherkin Steps**", f"📝 {len(result.gherkin_steps)}")
+        
+        if result.expected_assertions:
+            passed = len(result.expected_assertions) if result.status == "passed" else 0
+            total = len(result.expected_assertions)
+            md += self.md.table_row("**Assertions**", f"✅ {passed}/{total} passed")
+        
         md += "\n"
         
         return md
@@ -374,15 +389,35 @@ class TestRailSync:
     # HELPER METHODS
     # ============================================================================
     
-    def _detect_step_type(self, step: str) -> Optional[StepType]:
-        """Detect Gherkin step type from text"""
-        step_lower = step.lower().strip()
+    def _format_step_with_icon(self, step: str) -> str:
+        """
+        Format step with appropriate icon based on keyword
+        """
+        step = step.strip()
+        step_lower = step.lower()
         
-        for step_type in StepType:
-            if step_lower.startswith(step_type.keyword.lower()):
-                return step_type
-        
-        return None
+        # Detect keyword and add icon
+        if step_lower.startswith('given'):
+            icon = "🎯"
+            clean = step[5:].strip()
+            return f"{icon} **Given** {clean}"
+        elif step_lower.startswith('when'):
+            icon = "⚡"
+            clean = step[4:].strip()
+            return f"{icon} **When** {clean}"
+        elif step_lower.startswith('then'):
+            icon = "✅"
+            clean = step[4:].strip()
+            return f"{icon} **Then** {clean}"
+        elif step_lower.startswith('and'):
+            icon = "➕"
+            clean = step[3:].strip()
+            return f"{icon} **And** {clean}"
+        elif 'match' in step_lower:
+            icon = "🔍"
+            return f"{icon} {step}"
+        else:
+            return f"▪️ {step}"
     
     def _format_step(self, step: str) -> str:
         """
@@ -390,7 +425,7 @@ class TestRailSync:
         """
         step = step.strip()
         
-        # Remove redundant Gherkin keywords
+        # Remove redundant Gherkin keywords pero mantener estructura
         for keyword in ['Given', 'When', 'Then', 'And', 'But']:
             if step.startswith(f"{keyword} "):
                 step = step[len(keyword):].strip()
@@ -404,19 +439,27 @@ class TestRailSync:
         """
         clean = assertion.strip()
         
-        # Remove verbose keywords
+        # Remove verbose keywords pero mantener info útil
         replacements = {
             'And match ': '',
             'match ': '',
-            'Then status ': 'HTTP Status: ',
-            'And status ': 'HTTP Status: ',
-            'status ': 'HTTP Status: ',
+            'Then status ': '**HTTP Status:** ',
+            'And status ': '**HTTP Status:** ',
+            'status ': '**HTTP Status:** ',
         }
         
         for old, new in replacements.items():
             if clean.startswith(old):
                 clean = new + clean[len(old):].strip()
                 break
+        
+        # Envolver valores en backticks si es posible
+        if '==' in clean:
+            parts = clean.split('==')
+            if len(parts) == 2:
+                left = parts[0].strip()
+                right = parts[1].strip()
+                clean = f"{left} == `{right}`"
         
         return clean
     

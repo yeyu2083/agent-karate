@@ -186,21 +186,31 @@ class TestRailSync:
         return md
     
     def _build_preconditions(self, result: TestResult) -> str:
-        """Build preconditions from Background steps"""
+        """Build preconditions from Background steps with visual styling"""
         steps = []
         if result.background_steps and len(result.background_steps) > 0:
             steps = result.background_steps
         else:
             steps = ["Given the API is accessible", "And the test environment is configured"]
         
-        md = "```gherkin\n"
+        md = "📋 **Precondiciones:**\n"
+        md += "```gherkin\n"
         for step in steps:
-            md += f"{step}\n"
-        md += "```"
+            if step.strip().lower().startswith('given'):
+                md += f"🎯 {step}\n"
+            elif step.strip().lower().startswith('when'):
+                md += f"⚡ {step}\n"
+            elif step.strip().lower().startswith('then'):
+                md += f"✔️ {step}\n"
+            elif step.strip().lower().startswith('and'):
+                md += f"• {step}\n"
+            else:
+                md += f"{step}\n"
+        md += "```\n"
         return md
     
     def _build_steps(self, result: TestResult) -> str:
-        """Build test steps from Gherkin definition"""
+        """Build test steps from Gherkin definition with visual formatting"""
         steps = []
         if result.gherkin_steps and len(result.gherkin_steps) > 0:
             steps = result.gherkin_steps
@@ -212,37 +222,53 @@ class TestRailSync:
                 "And Validate response body"
             ]
         
-        md = "```gherkin\n"
+        md = "⚙️ **Pasos de Karate:**\n"
+        md += "```gherkin\n"
         for i, step in enumerate(steps, 1):
-            md += f"{step}\n"
-        md += "```"
+            step_lower = step.strip().lower()
+            if step_lower.startswith('given'):
+                md += f"🎯 {step}\n"
+            elif step_lower.startswith('when'):
+                md += f"⚡ {step}\n"
+            elif step_lower.startswith('then'):
+                md += f"✔️ {step}\n"
+            elif step_lower.startswith('and'):
+                md += f"• {step}\n"
+            else:
+                md += f"{step}\n"
+        md += "```\n"
         return md
     
     def _build_expected_result(self, result: TestResult) -> str:
-        """Build expected result from assertions and test status"""
+        """Build expected result from assertions and test status with full visual detail"""
         md = ""
         
-        # Status
+        md += "---\n"
         if result.status == 'passed':
-            md += "✅ **Result: PASSED**\n\n"
+            md += "✅ **RESULTADO: PASSED** 🎉\n"
         else:
-            md += "❌ **Result: FAILED**\n\n"
+            md += "❌ **RESULTADO: FAILED** ⚠️\n"
+        md += "---\n\n"
         
-        # Assertions
         if result.expected_assertions and len(result.expected_assertions) > 0:
-            md += "**Expected Assertions:**\n"
+            md += "🔍 **Validaciones Esperadas:**\n\n"
             md += "```gherkin\n"
-            for assertion in result.expected_assertions:
+            for i, assertion in enumerate(result.expected_assertions, 1):
                 clean = assertion.strip()
                 if not clean.startswith("match") and not clean.startswith("status"):
-                    md += f"And match {clean}\n"
+                    md += f"{i}. And match {clean}\n"
                 else:
-                    md += f"{clean}\n"
-            md += "```\n"
+                    md += f"{i}. {clean}\n"
+            md += "```\n\n"
         
-        # Error details
         if result.error_message:
-            md += f"\n**Error:**  \n{result.error_message}"
+            md += "🔴 **Detalles del Error:**\n"
+            md += f"```\n{result.error_message}\n```\n"
+        
+        md += f"\n📊 **Estado**: {result.status.upper()}"
+        if result.duration:
+            md += f" | ⏱️ **Duración**: {result.duration:.2f}s"
+        md += "\n"
         
         return md
     

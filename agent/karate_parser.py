@@ -14,13 +14,32 @@ class KarateParser:
         """Pre-cargar todos los archivos .feature y extraer sus backgrounds"""
         if not feature_dir:
             # Buscar por defecto en src/test/java/examples
-            feature_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'test', 'java', 'examples')
+            # Probar varias rutas posibles
+            possible_paths = [
+                os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'test', 'java', 'examples'),
+                os.path.join(os.getcwd(), 'src', 'test', 'java', 'examples'),
+                os.path.join(os.getcwd(), 'agent-karate', 'src', 'test', 'java', 'examples'),
+                '/app/src/test/java/examples',  # Docker
+                'C:\\Users\\Yeyu\\laboratorioDexter\\agent-karate\\agent-karate\\src\\test\\java\\examples'  # Desarrollo
+            ]
+            
+            for path in possible_paths:
+                if os.path.exists(path):
+                    feature_dir = path
+                    print(f"✓ Found feature directory: {feature_dir}")
+                    break
+        
+        if not feature_dir:
+            print(f"⚠️ Feature directory not found in any location")
+            return
         
         feature_dir = os.path.abspath(feature_dir)
         
         if not os.path.exists(feature_dir):
             print(f"⚠️ Feature directory not found: {feature_dir}")
             return
+        
+        print(f"📁 Loading features from: {feature_dir}")
         
         # Buscar todos los archivos .feature
         for root, dirs, files in os.walk(feature_dir):
@@ -34,6 +53,10 @@ class KarateParser:
                         
                         if background_steps:
                             print(f"✓ Loaded background from {file}: {len(background_steps)} steps")
+                            for step in background_steps:
+                                print(f"    - {step}")
+                        else:
+                            print(f"⚠️ No background found in {file}")
                     except Exception as e:
                         print(f"⚠️ Error reading feature file {file_path}: {e}")
     
@@ -377,26 +400,18 @@ class KarateParser:
         # Primero intentar obtener del cache (de archivos .feature en bruto)
         feature_name = feature.get('name', '')
         if feature_name:
-            # Intentar diferentes variaciones del nombre
-            # 1. Nombre exacto
-            cached = KarateParser.get_background_for_feature(feature_name)
-            if cached:
-                print(f"✓ Background encontrado en cache para: {feature_name}")
-                return cached
+            feature_lower = feature_name.lower()
             
-            # 2. Usar la primera palabra del nombre de feature (ej: "API de Posts..." → "posts")
-            # Extraer última palabra antes de "Pruebas" o similar
-            words = feature_name.lower().split()
-            for word in reversed(words):
-                if word and word not in ['de', 'api', 'testing', 'pruebas', 'completo', 'para', 'autenticación', 'autorización', 'usuarios', 'publicaciones']:
-                    cached = KarateParser.get_background_for_feature(word)
+            # Palabras clave que sabemos que existen en el cache
+            for keyword in ['posts', 'auth', 'users']:
+                if keyword in feature_lower:
+                    cached = KarateParser.get_background_for_feature(keyword)
                     if cached:
-                        print(f"✓ Background encontrado en cache para: {word} (from {feature_name})")
+                        print(f"✓ Background encontrado en cache: {keyword}")
                         return cached
             
-            # 3. Si no encontramos nada, listar el cache para debug
-            print(f"⚠️ Background NO encontrado en cache para: {feature_name}")
-            print(f"   Cache disponible: {list(KarateParser._feature_backgrounds_cache.keys())}")
+            # Debug
+            print(f"⚠️ Background NO encontrado para '{feature_name}'. Cache: {list(KarateParser._feature_backgrounds_cache.keys())}")
         
         # Si no está en cache, extraer del JSON
         try:
@@ -409,14 +424,8 @@ class KarateParser:
                         text = step.get('text', '').strip()
                         if keyword and text:
                             steps.append(f"{keyword} {text}")
-                
-                if steps:
-                    print(f"✓ Background extraído del JSON: {len(steps)} pasos")
-                    return steps
         except Exception as e:
-            print(f"Error extrayendo background del JSON: {e}")
-        
-        print(f"⚠️ No se encontró Background para: {feature_name}")
+            pass
         return steps
     
     @staticmethod

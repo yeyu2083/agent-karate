@@ -2,8 +2,12 @@ Feature: API de Usuarios - Testing Completo
   Pruebas completas para el API de usuarios incluyendo CRUD y validaciones
 
   Background:
-    * url baseUrl
-    * header Accept = 'application/json'
+    # Precondiciones globales aplicadas a todos los escenarios
+    * url baseUrl                                             
+    * header Accept = 'application/json'                     
+    # Prerequisitos: API endpoint de usuarios es accesible
+    # Prerequisito: Base de datos de usuarios inicializada
+    # Prerequisito: Datos seed de usuarios disponibles
 
   @smoke @get
   Scenario: Obtener lista de usuarios

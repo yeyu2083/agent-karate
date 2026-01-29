@@ -114,6 +114,7 @@ class KarateParser:
             # Extraer pasos del Gherkin
             gherkin_steps = KarateParser._extract_gherkin_steps_from_result(scenario)
             background_steps = []  # No disponible en este formato
+            prerequisites = []  # No disponible en este formato
             expected_assertions = KarateParser._extract_expected_assertions_from_result(scenario)
             examples = []
             
@@ -126,6 +127,7 @@ class KarateParser:
                 steps=steps_data,
                 gherkin_steps=gherkin_steps,
                 background_steps=background_steps,
+                prerequisites=prerequisites,
                 expected_assertions=expected_assertions,
                 examples=examples
             )
@@ -258,6 +260,7 @@ class KarateParser:
             # Extraer pasos del Gherkin si disponible
             gherkin_steps = KarateParser._extract_gherkin_steps(feature, scenario)
             background_steps = KarateParser._extract_background_steps(feature)
+            prerequisites = KarateParser._extract_prerequisites(feature)
             expected_assertions = KarateParser._extract_expected_assertions(scenario)
             examples = KarateParser._extract_examples(feature, scenario)
             
@@ -270,6 +273,7 @@ class KarateParser:
                 steps=steps_data,
                 gherkin_steps=gherkin_steps,
                 background_steps=background_steps,
+                prerequisites=prerequisites,
                 expected_assertions=expected_assertions,
                 examples=examples
             ))
@@ -309,6 +313,27 @@ class KarateParser:
         except Exception as e:
             pass
         return steps
+    
+    @staticmethod
+    def _extract_prerequisites(feature: Dict) -> List[str]:
+        """Extraer Prerequisitos/Precondiciones del Background (comentarios con '# Prerequisito:')"""
+        prerequisites = []
+        try:
+            background = feature.get('background')
+            if background and isinstance(background, dict):
+                background_steps = background.get('steps', [])
+                for step in background_steps:
+                    if isinstance(step, dict):
+                        text = step.get('text', '').strip()
+                        # Buscar comentarios que empiezan con "Prerequisito:" o "Precondición:"
+                        if text.startswith('Prerequisito:') or text.startswith('Precondición:'):
+                            # Limpiar el prefijo y agregar
+                            prereq = text.replace('Prerequisito:', '').replace('Precondición:', '').strip()
+                            if prereq:
+                                prerequisites.append(prereq)
+        except Exception as e:
+            pass
+        return prerequisites
     
     @staticmethod
     def _extract_expected_assertions(scenario: Dict) -> List[str]:

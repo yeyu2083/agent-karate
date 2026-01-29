@@ -2,11 +2,15 @@ Feature: Autenticación y Autorización
   Pruebas de autenticación con tokens y manejo de sesiones
 
   Background:
-    * url apiUrl
+    # Precondiciones globales aplicadas a todos los escenarios
+    * url apiUrl                                                                                     # https://reqres.in/api (o QA según ambiente)
     * header User-Agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     * header Accept-Language = 'es-ES,es;q=0.9'
     * header Accept-Encoding = 'gzip, deflate, br'
     * header Cache-Control = 'max-age=0'
+    # Prerequisitos: Servidor de autenticación es accesible y respondiendo
+    # Prerequisito: Credenciales de prueba validas disponibles
+    # Prerequisito: SSL/TLS configurado correctamente
 
   @smoke @auth
   Scenario Outline: Validación de login con diferentes credenciales

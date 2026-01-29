@@ -11,6 +11,7 @@ class TestResult(BaseModel):
     steps: List[dict] = Field(default_factory=list)
     gherkin_steps: List[str] = Field(default_factory=list)  # Pasos del .feature (Given/When/Then)
     background_steps: List[str] = Field(default_factory=list)  # Pasos del Background
+    prerequisites: List[str] = Field(default_factory=list)  # Precondiciones extraídas del Background
     expected_assertions: List[str] = Field(default_factory=list)  # Match statements (Then/And match)
     examples: List[dict] = Field(default_factory=list)  # Datos de Examples si es Scenario Outline
 

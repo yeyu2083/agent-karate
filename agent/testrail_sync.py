@@ -231,11 +231,11 @@ class TestRailSync:
             step_lower = step.strip().lower()
             # Agregar emoji separado y luego el paso
             if step_lower.startswith('given'):
-                md += f"**{i}. 🎯 GIVEN**\n{step}\n\n"
+                md += f"**{i}.  GIVEN**\n{step}\n\n"
             elif step_lower.startswith('when'):
-                md += f"**{i}. ⚡ WHEN**\n{step}\n\n"
+                md += f"**{i}.  WHEN**\n{step}\n\n"
             elif step_lower.startswith('then'):
-                md += f"**{i}. ✔️ THEN**\n{step}\n\n"
+                md += f"**{i}.  THEN**\n{step}\n\n"
             elif step_lower.startswith('and'):
                 md += f"**{i}. • AND**\n{step}\n\n"
             else:

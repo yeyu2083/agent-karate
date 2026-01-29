@@ -186,33 +186,25 @@ class TestRailSync:
         return md
     
     def _build_preconditions(self, result: TestResult) -> str:
-        """Build preconditions from Background steps with visual styling and better line breaks"""
+        """Build preconditions from Background steps with clean formatting"""
         steps = []
         if result.background_steps and len(result.background_steps) > 0:
             steps = result.background_steps
         else:
             steps = ["Given the API is accessible", "And the test environment is configured"]
         
+        # Formato limpio y legible
         md = "**📋 Precondiciones:**\n\n"
         
-        for i, step in enumerate(steps, 1):
-            step_lower = step.strip().lower()
-            # Agregar emoji separado y luego el paso
-            if step_lower.startswith('given'):
-                md += f"**{i}. 🎯 GIVEN**\n{step}\n\n"
-            elif step_lower.startswith('when'):
-                md += f"**{i}. ⚡ WHEN**\n{step}\n\n"
-            elif step_lower.startswith('then'):
-                md += f"**{i}. ✔️ THEN**\n{step}\n\n"
-            elif step_lower.startswith('and'):
-                md += f"**{i}. • AND**\n{step}\n\n"
-            else:
-                md += f"**{i}.** {step}\n\n"
+        for step in steps:
+            step_clean = step.strip()
+            md += f"- {step_clean}\n"
         
+        md += "\n"
         return md
     
     def _build_steps(self, result: TestResult) -> str:
-        """Build test steps from Gherkin definition with visual formatting and better line breaks"""
+        """Build test steps from Gherkin definition with clean formatting"""
         steps = []
         if result.gherkin_steps and len(result.gherkin_steps) > 0:
             steps = result.gherkin_steps
@@ -224,29 +216,21 @@ class TestRailSync:
                 "And Validate response body"
             ]
         
-        # Usar formato de lista con separación visual entre pasos
+        # Formato limpio y legible para TestRail
         md = "**⚙️ Pasos de Karate:**\n\n"
         
-        for i, step in enumerate(steps, 1):
-            step_lower = step.strip().lower()
-            # Agregar emoji separado y luego el paso
-            if step_lower.startswith('given'):
-                md += f"**{i}.  GIVEN**\n{step}\n\n"
-            elif step_lower.startswith('when'):
-                md += f"**{i}.  WHEN**\n{step}\n\n"
-            elif step_lower.startswith('then'):
-                md += f"**{i}.  THEN**\n{step}\n\n"
-            elif step_lower.startswith('and'):
-                md += f"**{i}. • AND**\n{step}\n\n"
-            else:
-                md += f"**{i}.** {step}\n\n"
+        for step in steps:
+            step_clean = step.strip()
+            md += f"- {step_clean}\n"
         
+        md += "\n"
         return md
     
     def _build_expected_result(self, result: TestResult) -> str:
-        """Build expected result from assertions and test status with full visual detail"""
+        """Build expected result from assertions and test status with visual detail"""
         md = ""
         
+        # Status header con emojis grandes
         md += "---\n"
         if result.status == 'passed':
             md += "✅ **RESULTADO: PASSED** 🎉\n"
@@ -254,21 +238,28 @@ class TestRailSync:
             md += "❌ **RESULTADO: FAILED** ⚠️\n"
         md += "---\n\n"
         
+        # Validaciones con emojis en lugar de números
         if result.expected_assertions and len(result.expected_assertions) > 0:
             md += "🔍 **Validaciones Esperadas:**\n\n"
-            md += "```gherkin\n"
-            for i, assertion in enumerate(result.expected_assertions, 1):
+            emojis = ["✓", "•", "◆", "★", "◇", "▪", "◈", "○"]
+            for i, assertion in enumerate(result.expected_assertions):
                 clean = assertion.strip()
-                if not clean.startswith("match") and not clean.startswith("status"):
-                    md += f"{i}. And match {clean}\n"
-                else:
-                    md += f"{i}. {clean}\n"
-            md += "```\n\n"
+                emoji = emojis[i % len(emojis)]
+                
+                # Formatear la aserción de manera legible
+                if clean.startswith("match"):
+                    clean = clean[5:].strip()
+                
+                md += f"**{emoji}** {clean}\n"
+            
+            md += "\n"
         
+        # Error details si falló
         if result.error_message:
             md += "🔴 **Detalles del Error:**\n"
             md += f"```\n{result.error_message}\n```\n"
         
+        # Footer con métricas
         md += f"\n📊 **Estado**: {result.status.upper()}"
         if result.duration:
             md += f" | ⏱️ **Duración**: {result.duration:.2f}s"

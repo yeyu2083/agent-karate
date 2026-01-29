@@ -213,6 +213,9 @@ class KarateParser:
             # ✅ Extraer Background steps de stepResults
             background_steps = KarateParser._extract_background_steps(scenario)
             
+            # ✅ Extraer Tags
+            tags = scenario.get('tags', [])
+            
             prerequisites = []  # No disponible en este formato
             expected_assertions = KarateParser._extract_expected_assertions_from_result(scenario)
             examples = []
@@ -228,7 +231,8 @@ class KarateParser:
                 background_steps=background_steps,
                 prerequisites=prerequisites,
                 expected_assertions=expected_assertions,
-                examples=examples
+                examples=examples,
+                tags=tags
             )
         except Exception as e:
             print(f"⚠️ Error parsing scenario: {e}")

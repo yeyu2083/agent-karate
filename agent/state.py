@@ -14,6 +14,7 @@ class TestResult(BaseModel):
     prerequisites: List[str] = Field(default_factory=list)  # Precondiciones extraídas del Background
     expected_assertions: List[str] = Field(default_factory=list)  # Match statements (Then/And match)
     examples: List[dict] = Field(default_factory=list)  # Datos de Examples si es Scenario Outline
+    tags: List[str] = Field(default_factory=list)  # Tags del scenario (@tag1, @tag2)
 
 
 class TestRailRunState(TypedDict):

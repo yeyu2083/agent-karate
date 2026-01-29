@@ -210,6 +210,12 @@ class TestRailSync:
         # Header con emoji y feature
         md += self.md.header(f"🧪 {result.feature}", level=2)
         md += self.md.blockquote(f"**Scenario:** {result.scenario}")
+        
+        # ✅ Tags en descripción
+        if result.tags:
+            tags_str = " ".join([f"[{tag}]" for tag in result.tags])
+            md += self.md.blockquote(f"🏷️ **Tags:** {tags_str}")
+        
         md += "\n"
         
         # Stats table con más info y mejor formato

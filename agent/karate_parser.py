@@ -1,13 +1,92 @@
 import json
 import os
+import re
 from typing import List, Dict, Any, Optional
 from .state import TestResult
 
 
 class KarateParser:
+    # Cache para almacenar backgrounds extraídos de archivos .feature
+    _feature_backgrounds_cache: Dict[str, List[str]] = {}
+    
+    @staticmethod
+    def load_feature_files(feature_dir: str = None):
+        """Pre-cargar todos los archivos .feature y extraer sus backgrounds"""
+        if not feature_dir:
+            # Buscar por defecto en src/test/java/examples
+            feature_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'test', 'java', 'examples')
+        
+        feature_dir = os.path.abspath(feature_dir)
+        
+        if not os.path.exists(feature_dir):
+            print(f"⚠️ Feature directory not found: {feature_dir}")
+            return
+        
+        # Buscar todos los archivos .feature
+        for root, dirs, files in os.walk(feature_dir):
+            for file in files:
+                if file.endswith('.feature'):
+                    file_path = os.path.join(root, file)
+                    try:
+                        background_steps = KarateParser._extract_background_from_file(file_path)
+                        feature_name = os.path.basename(file).replace('.feature', '')
+                        KarateParser._feature_backgrounds_cache[feature_name] = background_steps
+                        
+                        if background_steps:
+                            print(f"✓ Loaded background from {file}: {len(background_steps)} steps")
+                    except Exception as e:
+                        print(f"⚠️ Error reading feature file {file_path}: {e}")
+    
+    @staticmethod
+    def _extract_background_from_file(file_path: str) -> List[str]:
+        """Extraer Background directamente del archivo .feature"""
+        background_steps = []
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Buscar sección Background
+            # Regex: Background: ... hasta que encuentre el primer Scenario
+            background_match = re.search(
+                r'Background:\s*\n((?:.*\n)*?)(?=\s*(?:@|\w+\s+Scenario))',
+                content,
+                re.MULTILINE
+            )
+            
+            if background_match:
+                background_section = background_match.group(1)
+                
+                # Extraer pasos (líneas que empiezan con * o espacios + *)
+                for line in background_section.split('\n'):
+                    line = line.strip()
+                    # Detectar pasos del Karate (*, Given, When, Then, And)
+                    if line and (line.startswith('*') or 
+                                line.startswith('Given') or 
+                                line.startswith('When') or 
+                                line.startswith('Then') or 
+                                line.startswith('And')):
+                        # Limpiar la línea
+                        if line.startswith('*'):
+                            line = 'And ' + line[1:].lstrip()
+                        background_steps.append(line.strip())
+        
+        except Exception as e:
+            print(f"Error extracting background from {file_path}: {e}")
+        
+        return background_steps
+    
+    @staticmethod
+    def get_background_for_feature(feature_name: str) -> List[str]:
+        """Obtener background cacheado para una feature"""
+        return KarateParser._feature_backgrounds_cache.get(feature_name, [])
+    
     @staticmethod
     def parse_karate_json(file_path: str) -> List[TestResult]:
         results: List[TestResult] = []
+        
+        # Pre-cargar backgrounds de archivos .feature
+        KarateParser.load_feature_files()
+        
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -71,6 +150,7 @@ class KarateParser:
                         steps=[],
                         gherkin_steps=[],
                         background_steps=[],
+                        prerequisites=[],
                         expected_assertions=[],
                         examples=[]
                     ))
@@ -300,6 +380,15 @@ class KarateParser:
     def _extract_background_steps(feature: Dict) -> List[str]:
         """Extraer pasos del Background de la feature"""
         steps = []
+        
+        # Primero intentar obtener del cache (de archivos .feature en bruto)
+        feature_name = feature.get('name', '')
+        if feature_name:
+            cached_background = KarateParser.get_background_for_feature(feature_name.replace(' - ', '').split('.')[0].strip())
+            if cached_background:
+                return cached_background
+        
+        # Si no está en cache, extraer del JSON
         try:
             background = feature.get('background')
             if background and isinstance(background, dict):

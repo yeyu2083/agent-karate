@@ -321,65 +321,74 @@ class TestRailSync:
         """
         md = ""
         
-        # Status banner con separadores
-        md += self.md.horizontal_rule()
+        # Status banner con separadores y más énfasis
+        md += "\n"
+        md += "═══════════════════════════════════════════════════════\n\n"
         md += self.md.header(self.md.status_badge(result.status), level=2)
-        md += self.md.horizontal_rule()
+        md += "═══════════════════════════════════════════════════════\n\n"
         
-        # Validations con mejor formato
+        # Validations con formato mejorado - SIN TABLA, con formato lista estilizada
         if result.expected_assertions:
             md += self.md.header("🔍 Validations", level=3)
-            
-            # Tabla de validaciones en lugar de lista
-            md += self.md.table_header("✓", "Assertion", "Status")
+            md += "\n"
             
             for i, assertion in enumerate(result.expected_assertions, 1):
                 clean_assertion = self._clean_assertion(assertion)
                 
                 # Status icon basado en el resultado general
-                status_icon = "✅" if result.status == "passed" else "❌"
+                if result.status == "passed":
+                    status_icon = "✅"
+                    status_text = "PASS"
+                else:
+                    status_icon = "❌"
+                    status_text = "FAIL"
                 
-                md += self.md.table_row(
-                    f"**{i}**",
-                    clean_assertion,
-                    status_icon
-                )
+                # Formato lista estilizada con números y boxes
+                md += f"**`{i:02d}`** {status_icon} **{status_text}** │ {clean_assertion}\n\n"
             
             md += "\n"
         
         # Error details si falló - formato mejorado
         if result.error_message:
-            md += self.md.header("🔴 Error Details", level=3)
-            md += self.md.blockquote("⚠️ **The test failed with the following error:**")
             md += "\n"
+            md += "─────────────────────────────────────────────────────\n\n"
+            md += self.md.header("🔴 Error Details", level=3)
+            md += "\n"
+            md += "⚠️ **The test failed with the following error:**\n\n"
             
             # Code block con el error
             md += self.md.code_block(result.error_message, "")
             md += "\n"
         
-        # Metadata footer con tabla
-        md += self.md.horizontal_rule()
+        # Metadata footer con mejor diseño - SIN tabla, con formato de bloques
+        md += "\n"
+        md += "─────────────────────────────────────────────────────\n\n"
         md += self.md.header("📌 Test Metadata", level=4)
+        md += "\n"
         
-        # Tabla de metadata
-        md += self.md.table_header("Property", "Value")
+        # Formato de bloques en lugar de tabla
+        metadata_items = []
         
-        md += self.md.table_row("**Feature**", self.md.code_inline(result.feature))
-        md += self.md.table_row("**Status**", self.md.status_badge(result.status))
+        metadata_items.append(f"🏷️ **Feature:** `{result.feature}`")
+        metadata_items.append(f"📊 **Status:** {self.md.status_badge(result.status)}")
         
         if result.duration:
-            md += self.md.table_row("**Duration**", f"⏱️ {result.duration:.3f}s")
+            metadata_items.append(f"⏱️ **Duration:** `{result.duration:.3f}s`")
         
         if result.steps:
-            md += self.md.table_row("**Steps Executed**", f"🔢 {len(result.steps)}")
+            metadata_items.append(f"🔢 **Steps Executed:** `{len(result.steps)}`")
         
         if result.gherkin_steps:
-            md += self.md.table_row("**Gherkin Steps**", f"📝 {len(result.gherkin_steps)}")
+            metadata_items.append(f"📝 **Gherkin Steps:** `{len(result.gherkin_steps)}`")
         
         if result.expected_assertions:
             passed = len(result.expected_assertions) if result.status == "passed" else 0
             total = len(result.expected_assertions)
-            md += self.md.table_row("**Assertions**", f"✅ {passed}/{total} passed")
+            metadata_items.append(f"✅ **Assertions:** `{passed}/{total}` passed")
+        
+        # Mostrar en formato de bloques con bullets
+        for item in metadata_items:
+            md += f"- {item}\n"
         
         md += "\n"
         
@@ -436,6 +445,7 @@ class TestRailSync:
     def _clean_assertion(self, assertion: str) -> str:
         """
         Clean up assertion text para mejor legibilidad
+        Incluye formato visual mejorado
         """
         clean = assertion.strip()
         
@@ -443,9 +453,9 @@ class TestRailSync:
         replacements = {
             'And match ': '',
             'match ': '',
-            'Then status ': '**HTTP Status:** ',
-            'And status ': '**HTTP Status:** ',
-            'status ': '**HTTP Status:** ',
+            'Then status ': '**HTTP Status** → ',
+            'And status ': '**HTTP Status** → ',
+            'status ': '**HTTP Status** → ',
         }
         
         for old, new in replacements.items():
@@ -453,13 +463,26 @@ class TestRailSync:
                 clean = new + clean[len(old):].strip()
                 break
         
-        # Envolver valores en backticks si es posible
+        # Mejorar formato de comparaciones
         if '==' in clean:
             parts = clean.split('==')
             if len(parts) == 2:
                 left = parts[0].strip()
                 right = parts[1].strip()
-                clean = f"{left} == `{right}`"
+                
+                # Si es HTTP Status, formato especial
+                if 'HTTP Status' in clean:
+                    clean = f"**HTTP Status** → `{right}`"
+                else:
+                    # Formato mejorado con flecha
+                    clean = f"`{left}` **must equal** `{right}`"
+        
+        # Highlight de tipos especiales
+        clean = clean.replace("'#array'", "`#array` 📋")
+        clean = clean.replace("'#object'", "`#object` 📦")
+        clean = clean.replace("'#string'", "`#string` 📝")
+        clean = clean.replace("'#number'", "`#number` 🔢")
+        clean = clean.replace("'#boolean'", "`#boolean` ✓/✗")
         
         return clean
     

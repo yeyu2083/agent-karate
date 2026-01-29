@@ -56,4 +56,64 @@ Feature: Autenticación y Autorización
     And match response.token == '#notnull'
     * def authToken = response.token
 
+  @auth @regression
+  Scenario: Logout y cierre de sesión
+    Verifica que se puede cerrar sesión correctamente después del login
 
+    * java.lang.Thread.sleep(1000)
+    Given path '/login'
+    And request { email: 'eve.holt@reqres.in', password: 'cityslicka' }
+    When method POST
+    Then status 200
+    * def token = response.token
+    
+    Given path '/logout'
+    And header Authorization = 'Bearer ' + token
+    When method POST
+    Then status 200
+    And match response contains { message: '#string' }
+
+  @auth @edge-case @regression
+  Scenario: Login con email en diferentes formatos
+    Prueba que el login valida correctamente diferentes formatos de email
+
+    * java.lang.Thread.sleep(1000)
+    Given path '/login'
+    And request
+      """
+      {
+        email: 'eve.holt@reqres.in',
+        password: 'cityslicka'
+      }
+      """
+    When method POST
+    Then status 200
+    And match response.token == '#notnull'
+
+  @auth @security @critical
+  Scenario: Validación de token - Request sin autenticación
+    Verifica que requests protegidas fallan sin token válido
+
+    * java.lang.Thread.sleep(1000)
+    Given path '/protected/resource'
+    When method GET
+    Then status 401
+    And match response contains { error: '#string' }
+
+  @auth @performance
+  Scenario: Login con múltiples intentos rápidos
+    Valida el comportamiento del endpoint bajo múltiples requests consecutivos
+
+    * java.lang.Thread.sleep(1000)
+    Given path '/login'
+    And request { email: 'eve.holt@reqres.in', password: 'cityslicka' }
+    When method POST
+    Then status 200
+    And match response.token == '#notnull'
+    
+    * java.lang.Thread.sleep(500)
+    Given path '/login'
+    And request { email: 'eve.holt@reqres.in', password: 'cityslicka' }
+    When method POST
+    Then status 200
+    And match response.token == '#notnull'

@@ -183,7 +183,7 @@ class TestRailSync:
         steps = self._build_steps(result)
         expected_result = self._build_expected_result(result)
         
-        return {
+        case_data = {
             'title': title,
             'custom_automation_id': automation_id,
             'description': description,
@@ -194,8 +194,12 @@ class TestRailSync:
             'custom_feature': result.feature,
             'custom_is_automated': 1,
             'custom_status_actual': result.status,
-            'estimate': self._estimate_duration(result.duration) if result.duration else None,
         }
+        
+        # NO incluir estimate - TestRail es muy quisquilloso con este campo
+        # Si lo necesitás, tenés que configurarlo manualmente en TestRail
+        
+        return case_data
     
     # ============================================================================
     # FORMATTING METHODS - Aquí está la magia ✨
@@ -441,16 +445,3 @@ class TestRailSync:
         
         # Default: Medium
         return 3
-    
-    def _estimate_duration(self, duration: float) -> str:
-        """
-        Convert duration to TestRail estimate format (e.g., "30s", "2m")
-        """
-        if duration < 60:
-            return f"{int(duration)}s"
-        elif duration < 3600:
-            minutes = int(duration / 60)
-            return f"{minutes}m"
-        else:
-            hours = int(duration / 3600)
-            return f"{hours}h"

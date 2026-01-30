@@ -109,9 +109,28 @@ class TestRailSync:
     
     @staticmethod
     def _extract_pr_id_from_branch() -> Optional[str]:
-        """Extraer PR ID del nombre de la rama actual"""
+        """Extraer PR ID desde GitHub Actions env vars o rama actual"""
+        # 🎯 Primero: intentar obtener del contexto de GitHub Actions
+        github_pr_id = os.getenv('GITHUB_HEAD_REF')  # Para pull_request events
+        if github_pr_id:
+            print(f"✓ PR ID desde GitHub context: {github_pr_id}")
+            return github_pr_id
+        
+        # 🎯 Alternativa: usar GITHUB_REF si es un PR
+        github_ref = os.getenv('GITHUB_REF', '')
+        if 'pull' in github_ref:
+            # Ej: refs/pull/123/merge -> extraer 123
+            try:
+                pr_match = re.search(r'/pull/(\d+)/', github_ref)
+                if pr_match:
+                    pr_id = pr_match.group(1)
+                    print(f"✓ PR ID desde GITHUB_REF: {pr_id}")
+                    return pr_id
+            except Exception as e:
+                print(f"⚠️ No se pudo extraer PR ID de GITHUB_REF: {e}")
+        
+        # Fallback: extraer del nombre de la rama
         try:
-            # Obtener nombre de la rama actual
             result = subprocess.run(
                 ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
                 capture_output=True,
@@ -124,27 +143,28 @@ class TestRailSync:
                 print(f"✓ Rama actual: {branch_name}")
                 
                 # Patrones comunes para PR IDs:
-                # PR-123, PR123, issue-456, #789, worktree-2026-01-22T20-57-31, etc
+                # PR-123, PR123, issue-456, #789, SCRUM-4, etc
                 patterns = [
                     r'PR[#-]?(\d+)',      # PR-123 o PR#123
                     r'issue[#-]?(\d+)',   # issue-456
                     r'#(\d+)',            # #789
+                    r'([A-Z]+-\d+)',      # SCRUM-4, JIRA-123
                 ]
                 
                 for pattern in patterns:
                     match = re.search(pattern, branch_name, re.IGNORECASE)
                     if match:
                         pr_id = match.group(1)
-                        print(f"✓ PR ID extraído: {pr_id}")
+                        print(f"✓ ID extraído de rama: {pr_id}")
                         return pr_id
                 
                 # Si no encuentra patrón, usar todo después del última /
                 pr_id = branch_name.split('/')[-1]
-                print(f"✓ PR ID (rama completa): {pr_id}")
+                print(f"✓ ID (rama): {pr_id}")
                 return pr_id
         
         except Exception as e:
-            print(f"⚠️ No se pudo extraer PR ID de rama: {e}")
+            print(f"⚠️ No se pudo extraer ID de rama: {e}")
         
         return None
     

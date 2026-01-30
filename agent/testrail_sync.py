@@ -341,32 +341,25 @@ class TestRailSync:
             'custom_status_actual': result.status,
         }
         
-        # ✅ Agregar PR ID + tags a references
-        refs_list = []
-        if self.pr_id:
-            refs_list.append(self.pr_id)
-        # 🏷️ Agregar tags como referencias
+        # 🏷️ Agregar solo tags a references (para filtrar en TestRail)
         if result.tags:
-            refs_list.extend([f"@{tag}" for tag in result.tags])
-        
-        if refs_list:
-            case_data['refs'] = ', '.join(refs_list)
-        
-        # ✅ Agregar references con PR ID de la rama (si existe)
-        if self.pr_id:
-            case_data['refs'] = self.pr_id
+            case_data['refs'] = ', '.join([f"@{tag}" for tag in result.tags])
         
         # Debug: mostrar payload COMPLETO
         print(f"📋 Payload completo para caso: {automation_id}")
-        print(f"   Fields enviados:")
+        print(f"   Fields enviados por API:")
         for key, value in case_data.items():
             if key.startswith('custom_preconds') or key.startswith('custom_steps'):
                 print(f"   - {key}: {str(value)[:80]}...")
             else:
                 print(f"   - {key}: {value}")
         
-        # NOTA: 'labels' no es soportado por TestRail API en add_case
-        # Los tags se guardan en description y custom fields en lugar de labels
+        print(f"   ⚠️ Completa manualmente en TestRail:")
+        print(f"      • Is Automated: Sí")
+        print(f"      • Assigned To: {self._get_assigned_user_id() or 'TBD'}")
+        
+        # NOTA: TestRail API v2 no acepta is_automated ni assigned_to_id en add_case
+        # Deben editarse manualmente desde el FE
         
         return case_data
     

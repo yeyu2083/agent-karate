@@ -224,8 +224,24 @@ class TestRailSync:
                 if section_id:
                     created = self.client.add_case(section_id, case_data)
                     if created:
-                        print(f"✓ Created case #{created['id']}: {automation_id}")
-                        case_map[automation_id] = created['id']
+                        case_id = created['id']
+                        print(f"✓ Created case #{case_id}: {automation_id}")
+                        
+                        # 🔄 Actualizar campos que solo funcionan en update_case
+                        update_data = {}
+                        if self.automated_type_id:
+                            update_data['type_id'] = self.automated_type_id
+                        if case_data.get('is_automated'):
+                            update_data['is_automated'] = 1  # ✅ Usar 1 en lugar de True
+                        user_id = case_data.get('assigned_to_id')
+                        if user_id:
+                            update_data['assigned_to_id'] = user_id
+                        
+                        if update_data:
+                            self.client.update_case(case_id, update_data)
+                            print(f"  ✓ Updated fields: {list(update_data.keys())}")
+                        
+                        case_map[automation_id] = case_id
                 else:
                     print(f"⚠️ Cannot create case without section_id: {automation_id}")
         
@@ -314,7 +330,6 @@ class TestRailSync:
         
         case_data = {
             'title': title,
-            'type_id': self.automated_type_id,  # 🤖 Usar tipo "Automated" automáticamente
             'custom_automation_id': automation_id,
             'description': description,
             'custom_preconds': preconditions,
@@ -322,22 +337,24 @@ class TestRailSync:
             'custom_expected': expected_result,
             'priority_id': priority,
             'custom_feature': result.feature,
-            'is_automated': True,  # ✅ Marcar como automatizado
             'custom_status_actual': result.status,
-            'assigned_to_id': self._get_assigned_user_id(),  # 👤 Asignar a usuario actual
+            # Los siguientes campos se actualizarán en update_case
+            'is_automated': 1,  # ✅ Usar 1 para que TestRail lo reconozca
+            'assigned_to_id': self._get_assigned_user_id(),  # Para actualización posterior
         }
         
         # ✅ Agregar references con PR ID de la rama (si existe)
         if self.pr_id:
             case_data['refs'] = self.pr_id
         
-        # Debug: mostrar payload
-        print(f"📋 Payload para caso: {automation_id}")
-        print(f"   custom_preconds valor: {preconditions[:100]}...")
-        if result.tags:
-            print(f"   tags: {','.join(result.tags)}")
-        if self.pr_id:
-            print(f"   refs (PR ID): {self.pr_id}")
+        # Debug: mostrar payload COMPLETO
+        print(f"📋 Payload completo para caso: {automation_id}")
+        print(f"   Fields enviados:")
+        for key, value in case_data.items():
+            if key.startswith('custom_preconds') or key.startswith('custom_steps'):
+                print(f"   - {key}: {str(value)[:80]}...")
+            else:
+                print(f"   - {key}: {value}")
         
         # NOTA: 'labels' no es soportado por TestRail API en add_case
         # Los tags se guardan en description y custom fields en lugar de labels

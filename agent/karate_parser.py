@@ -216,6 +216,9 @@ class KarateParser:
             # ✅ Extraer Tags
             tags = scenario.get('tags', [])
             
+            # ✅ Extraer Example Index (si es Scenario Outline)
+            example_index = scenario.get('exampleIndex', -1)
+            
             prerequisites = []  # No disponible en este formato
             expected_assertions = KarateParser._extract_expected_assertions_from_result(scenario)
             examples = []
@@ -232,7 +235,8 @@ class KarateParser:
                 prerequisites=prerequisites,
                 expected_assertions=expected_assertions,
                 examples=examples,
-                tags=tags
+                tags=tags,
+                example_index=example_index
             )
         except Exception as e:
             print(f"⚠️ Error parsing scenario: {e}")

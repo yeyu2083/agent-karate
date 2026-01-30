@@ -15,6 +15,7 @@ class TestResult(BaseModel):
     expected_assertions: List[str] = Field(default_factory=list)  # Match statements (Then/And match)
     examples: List[dict] = Field(default_factory=list)  # Datos de Examples si es Scenario Outline
     tags: List[str] = Field(default_factory=list)  # Tags del scenario (@tag1, @tag2)
+    example_index: int = -1  # Index del ejemplo si es Scenario Outline (-1 si no)
 
 
 class TestRailRunState(TypedDict):

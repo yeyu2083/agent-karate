@@ -330,6 +330,7 @@ class TestRailSync:
         
         case_data = {
             'title': title,
+            'type_id': self.automated_type_id,  # 🤖 Tipo Automated
             'custom_automation_id': automation_id,
             'description': description,
             'custom_preconds': preconditions,
@@ -338,10 +339,18 @@ class TestRailSync:
             'priority_id': priority,
             'custom_feature': result.feature,
             'custom_status_actual': result.status,
-            # Los siguientes campos se actualizarán en update_case
-            'is_automated': 1,  # ✅ Usar 1 para que TestRail lo reconozca
-            'assigned_to_id': self._get_assigned_user_id(),  # Para actualización posterior
         }
+        
+        # ✅ Agregar PR ID + tags a references
+        refs_list = []
+        if self.pr_id:
+            refs_list.append(self.pr_id)
+        # 🏷️ Agregar tags como referencias
+        if result.tags:
+            refs_list.extend([f"@{tag}" for tag in result.tags])
+        
+        if refs_list:
+            case_data['refs'] = ', '.join(refs_list)
         
         # ✅ Agregar references con PR ID de la rama (si existe)
         if self.pr_id:

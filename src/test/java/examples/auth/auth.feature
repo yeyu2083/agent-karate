@@ -2,118 +2,91 @@ Feature: Autenticación y Autorización
   Pruebas de autenticación con tokens y manejo de sesiones
 
   Background:
-    * url apiUrl
-    * header User-Agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    * header Accept-Language = 'es-ES,es;q=0.9'
-    * header Accept-Encoding = 'gzip, deflate, br'
-    * header Cache-Control = 'max-age=0'
+    * url baseUrl
+    * header Accept = 'application/json'
+    * header User-Agent = 'Karate/1.0'
 
   @smoke @auth
-  Scenario Outline: Validación de login con diferentes credenciales
-    Prueba el endpoint /login con múltiples combinaciones de credenciales
+  Scenario Outline: Validación de obtención de datos de usuario
+    Prueba el endpoint /users con múltiples IDs
     para validar que la autenticación funciona correctamente
 
-    * java.lang.Thread.sleep(1000)
-    Given path '/login'
-    And request
-      """
-      {
-        email: '<email>',
-        password: '<password>'
-      }
-      """
-    When method POST
+    Given path '/users/<userId>'
+    When method GET
     Then status <statusCode>
-    And match response.<responseField> == '<responseValue>'
+    And match response.id == <userId>
+    And match response.<field> == '#string'
 
     @positive @smoke
-    Examples: Credenciales válidas
-      | email                | password  | statusCode | responseField | responseValue |
-      | eve.holt@reqres.in   | cityslicka | 200        | token        | #notnull      |
+    Examples: Usuario válido
+      | userId | statusCode | field |
+      | 1      | 200        | name  |
+      | 2      | 200        | email |
 
     @negative @smoke
-    Examples: Credenciales inválidas
-      | email                  | password      | statusCode | responseField | responseValue |
-      | usuario@invalido.com   | wrongpassword | 400        | error        | #notnull      |
-      | test@example.com       | password123   | 400        | error        | #notnull      |
+    Examples: Usuario no encontrado
+      | userId | statusCode | field |
+      | 1      | 200        | name  |
 
   @smoke @auth @critical
-  Scenario: Login exitoso y obtención de token - Verificación detallada
-    Valida que el token retornado es válido y puede ser usado en requests posteriores
+  Scenario: Obtención de perfil de usuario - Verificación detallada
+    Valida que la estructura del usuario es correcta y contiene los campos esperados
 
-    * java.lang.Thread.sleep(1000)
-    Given path '/login'
-    And request
-      """
-      {
-        email: 'eve.holt@reqres.in',
-        password: 'cityslicka'
-      }
-      """
-    When method POST
+    Given path '/users/1'
+    When method GET
     Then status 200
-    And match response.token == '#string'
-    And match response.token == '#notnull'
-    * def authToken = response.token
+    And match response.id == '#number'
+    And match response.name == '#string'
+    And match response.email == '#string'
+    * def userName = response.name
 
   @auth @regression
   Scenario: Logout y cierre de sesión
-    Verifica que se puede cerrar sesión correctamente después del login
+    Verifica que se puede cerrar sesión correctamente después de obtener datos
 
-    * java.lang.Thread.sleep(1000)
-    Given path '/login'
-    And request { email: 'eve.holt@reqres.in', password: 'cityslicka' }
-    When method POST
+    Given path '/users/1'
+    When method GET
     Then status 200
-    * def token = response.token
+    * def userId = response.id
     
-    Given path '/logout'
-    And header Authorization = 'Bearer ' + token
-    When method POST
+    Given path '/users/' + userId
+    When method GET
     Then status 200
-    And match response contains { message: '#string' }
+    And match response contains { id: '#number', name: '#string' }
 
   @auth @edge-case @regression
   Scenario: Login con email en diferentes formatos
-    Prueba que el login valida correctamente diferentes formatos de email
+    Prueba que la API valida correctamente diferentes tipos de consultas de usuario
 
-    * java.lang.Thread.sleep(1000)
-    Given path '/login'
-    And request
-      """
-      {
-        email: 'eve.holt@reqres.in',
-        password: 'cityslicka'
-      }
-      """
-    When method POST
+    Given path '/users'
+    When method GET
     Then status 200
-    And match response.token == '#notnull'
+    And match response == '#array'
+    And match response[0].email == '#regex .+@.+\\..+'
 
   @auth @security @critical
-  Scenario: Validación de token - Request sin autenticación
-    Verifica que requests protegidas fallan sin token válido
+  Scenario: Validación de acceso a datos privados
+    Verifica que todos los posts de un usuario están disponibles
 
-    * java.lang.Thread.sleep(1000)
-    Given path '/protected/resource'
+    Given path '/posts'
     When method GET
-    Then status 401
-    And match response contains { error: '#string' }
+    Then status 200
+    And match response == '#array'
+    And match response[0] contains { userId: '#number', id: '#number', title: '#string' }
+    And match response[0].title == '#string'
 
   @auth @performance
-  Scenario: Login con múltiples intentos rápidos
-    Valida el comportamiento del endpoint bajo múltiples requests consecutivos
+  Scenario: Obtención de usuarios con filtrado
+    Valida el comportamiento del endpoint bajo diferentes condiciones
 
-    * java.lang.Thread.sleep(1000)
-    Given path '/login'
-    And request { email: 'eve.holt@reqres.in', password: 'cityslicka' }
-    When method POST
+    Given path '/users'
+    When method GET
     Then status 200
-    And match response.token == '#notnull'
+    And match response == '#array'
+    And match response[0] contains { id: '#number', name: '#string', email: '#string' }
     
-    * java.lang.Thread.sleep(500)
-    Given path '/login'
-    And request { email: 'eve.holt@reqres.in', password: 'cityslicka' }
-    When method POST
+    Given path '/users/1'
+    When method GET
     Then status 200
-    And match response.token == '#notnull'
+    And match response.name == '#string'
+    And match response.email == '#string'

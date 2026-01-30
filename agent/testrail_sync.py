@@ -107,6 +107,7 @@ class TestRailSync:
         self.sections_cache = None
         self.md = MarkdownFormatter()
         self.pr_id = self._extract_pr_id_from_branch()
+        self.automated_type_id = self._get_automated_type_id()  # 🤖 Obtener ID del tipo "Automated"
     
     @staticmethod
     def _extract_pr_id_from_branch() -> Optional[str]:
@@ -167,6 +168,20 @@ class TestRailSync:
         except Exception as e:
             print(f"⚠️ No se pudo extraer ID de rama: {e}")
         
+        return None
+    
+    def _get_automated_type_id(self) -> Optional[int]:
+        """🤖 Obtener el ID del tipo de caso 'Automated'"""
+        try:
+            types = self.client.get_case_types()
+            for case_type in types:
+                if case_type.get('name', '').lower() == 'automated':
+                    type_id = case_type.get('id')
+                    print(f"✓ Tipo 'Automated' encontrado: ID={type_id}")
+                    return type_id
+            print(f"⚠️ Tipo 'Automated' no encontrado en TestRail")
+        except Exception as e:
+            print(f"⚠️ Error obteniendo tipos de casos: {e}")
         return None
     
     def sync_cases_from_karate(self, test_results: List[TestResult]) -> dict[str, int]:
@@ -299,7 +314,7 @@ class TestRailSync:
         
         case_data = {
             'title': title,
-            'type_id': 2,  # 🎯 Type: 2 = Functional (1 = Acceptance, 2 = Functional, 3 = Regression)
+            'type_id': self.automated_type_id,  # 🤖 Usar tipo "Automated" automáticamente
             'custom_automation_id': automation_id,
             'description': description,
             'custom_preconds': preconditions,
@@ -307,7 +322,7 @@ class TestRailSync:
             'custom_expected': expected_result,
             'priority_id': priority,
             'custom_feature': result.feature,
-            'custom_is_automated': 1,  # ✅ Marcar como automatizado (1 = true, 0 = false)
+            'is_automated': True,  # ✅ Marcar como automatizado
             'custom_status_actual': result.status,
             'assigned_to_id': self._get_assigned_user_id(),  # 👤 Asignar a usuario actual
         }

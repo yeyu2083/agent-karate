@@ -371,3 +371,35 @@ class TestRailClient:
         except Exception as e:
             print(f"⚠️ Error getting users list: {e}")
             return []
+    
+    def get_case_types(self) -> List[Dict[str, Any]]:
+        """Get available case types"""
+        url = f"{self.base_url}/get_case_types"
+        try:
+            response = requests.get(url, auth=self.auth, headers=self.headers)
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict) and 'types' in data:
+                return data['types']
+            return []
+        except Exception as e:
+            print(f"⚠️ Error getting case types: {e}")
+            return []
+
+    def get_case_types(self) -> List[Dict[str, Any]]:
+        """���️ GET /get_case_types - Obtener tipos de casos disponibles"""
+        url = f"{self.base_url}/get_case_types"
+        try:
+            response = requests.get(url, auth=self.auth, headers=self.headers)
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict) and 'types' in data:
+                return data['types']
+            return []
+        except Exception as e:
+            print(f"⚠️ Error getting case types: {e}")
+            return []

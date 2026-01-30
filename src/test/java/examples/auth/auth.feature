@@ -7,7 +7,7 @@ Feature: Autenticación y Autorización
     * header User-Agent = 'Karate/1.0'
 
   @smoke @auth
-  Scenario Outline: Validación de obtención de datos de usuario
+  Scenario Outline: Validación de obtención de datos de usuario [ID: <userId> - <field>]
     Prueba el endpoint /users con múltiples IDs
     para validar que la autenticación funciona correctamente
 

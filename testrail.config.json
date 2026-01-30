@@ -8,6 +8,17 @@
     "assigned_email": "ywindecker@gmail.com",
     "assigned_name": "Yesica Windecker"
   },
+  "mongodb": {
+    "uri": "${MONGO_URI}",
+    "enabled": true,
+    "description": "URI will be read from MONGO_URI environment variable for security"
+  },
+  "slack": {
+    "webhook_url": "${SLACK_WEBHOOK_URL}",
+    "enabled": true,
+    "channel": "#qa-automation",
+    "description": "Slack webhook for notifications. Get from: Slack → Apps → Incoming Webhooks"
+  },
   "karate": {
     "results_path": "target/karate-reports/karate-summary.json"
   },

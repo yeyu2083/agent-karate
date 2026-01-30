@@ -6,7 +6,7 @@ Feature: API de Posts - Pruebas de Publicaciones
     * header Content-Type = 'application/json'
 
   @smoke @get
-  Scenario Outline: Obtener posts por ID
+  Scenario Outline: Obtener posts por ID [<description>]
     Valida que se puede recuperar un post específico por su ID
     y que la estructura de respuesta es correcta
 
@@ -48,7 +48,7 @@ Feature: API de Posts - Pruebas de Publicaciones
     And assert response.length == 100
 
   @post @create
-  Scenario Outline: Crear nuevos posts
+  Scenario Outline: Crear nuevos posts [<title>]
     Prueba la creación de posts con diferentes combinaciones
     de datos y valida el retorno correcto
 

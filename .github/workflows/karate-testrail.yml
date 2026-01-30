@@ -127,8 +127,8 @@ jobs:
         run: |
           pip install -r agent/requirements.txt
       
-      # ===== 5. SUBMIT TO TESTRAIL =====
-      - name: "Submit results to TestRail"
+      # ===== 5. SUBMIT TO TESTRAIL & MONGODB =====
+      - name: "Submit results to TestRail & MongoDB"
         id: testrail
         env:
           TESTRAIL_URL: ${{ secrets.TESTRAIL_URL }}
@@ -136,6 +136,7 @@ jobs:
           TESTRAIL_API_KEY: ${{ secrets.TESTRAIL_API_KEY }}
           TESTRAIL_PROJECT_ID: ${{ steps.config.outputs.project_id }}
           TESTRAIL_SUITE_ID: ${{ steps.config.outputs.suite_id }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
           BUILD_NUMBER: ${{ steps.metadata.outputs.build_number }}
           BRANCH_NAME: ${{ steps.metadata.outputs.branch_name }}
           COMMIT_SHA: ${{ steps.metadata.outputs.commit_sha }}
@@ -144,7 +145,7 @@ jobs:
           LLM_PROVIDER: glm
           ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
         run: |
-          echo "🚀 Invoking TestRail sync agent..."
+          echo "🚀 Invoking TestRail sync agent (+ MongoDB)..."
           python -m agent.main 2>&1 | tee testrail-output.log
           
           # Extract run_id if exists

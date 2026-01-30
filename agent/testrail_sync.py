@@ -271,7 +271,8 @@ class TestRailSync:
         
         # 1️⃣ Intentar obtener del testrail.config.json (PRIORITARIO)
         try:
-            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'testrail.config.json')
+            # Ruta correcta: agent/__file__ → agent/ → parent (agent-karate/) → testrail.config.json
+            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'testrail.config.json')
             if os.path.exists(config_path):
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
@@ -279,6 +280,8 @@ class TestRailSync:
                     user_name = config.get('qa', {}).get('assigned_name', 'QA Lead')
                     if email_to_find and email_to_find != 'tu@email.com':
                         print(f"✓ Email de config.json: {email_to_find} ({user_name})")
+            else:
+                print(f"⚠️ Config file no encontrado en: {config_path}")
         except Exception as e:
             print(f"⚠️ No se pudo leer config.json: {e}")
         
@@ -327,6 +330,7 @@ class TestRailSync:
         preconditions = self._build_preconditions(result)
         steps = self._build_steps(result)
         expected_result = self._build_expected_result(result)
+        assigned_user_id = self._get_assigned_user_id()
         
         case_data = {
             'title': title,
@@ -340,6 +344,10 @@ class TestRailSync:
             'custom_feature': result.feature,
             'custom_status_actual': result.status,
         }
+        
+        # 👤 Agregar usuario asignado si se encontró
+        if assigned_user_id:
+            case_data['assigned_to_id'] = assigned_user_id
         
         # 🏷️ Agregar solo tags a references (para filtrar en TestRail)
         if result.tags:
@@ -356,10 +364,6 @@ class TestRailSync:
         
         print(f"   ⚠️ Completa manualmente en TestRail:")
         print(f"      • Is Automated: Sí")
-        print(f"      • Assigned To: {self._get_assigned_user_id() or 'TBD'}")
-        
-        # NOTA: TestRail API v2 no acepta is_automated ni assigned_to_id en add_case
-        # Deben editarse manualmente desde el FE
         
         return case_data
     

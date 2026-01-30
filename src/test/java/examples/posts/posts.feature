@@ -121,7 +121,7 @@ Feature: API de Posts - Pruebas de Publicaciones
     Then status 200
     And match response == '#array'
     And match response[0].userId == 1
-    And each response contains { userId: 1 }
+    And assert response.every(post => post.userId == 1)
 
   @get @pagination
   Scenario Outline: Obtener posts con paginación
@@ -134,7 +134,7 @@ Feature: API de Posts - Pruebas de Publicaciones
     When method GET
     Then status 200
     And match response == '#array'
-    And match response.length <= <limit>
+    And assert response.length <= <limit>
 
     @positive
     Examples: Paginación válida
@@ -154,7 +154,7 @@ Feature: API de Posts - Pruebas de Publicaciones
     When method GET
     Then status 200
     And match response == '#array'
-    And match response[0].id >= response[1].id
+    And assert response[0].id >= response[1].id
 
   @post @validation
   Scenario: Crear post con título vacío - Validación

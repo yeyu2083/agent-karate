@@ -4,6 +4,9 @@ TestRail Synchronization - ENHANCED VERSION v2
 Sync Karate test cases to TestRail with premium visual formatting
 """
 
+import os
+import re
+import subprocess
 from typing import Optional, List
 from enum import Enum
 from .testrail_client import TestRailClient
@@ -102,6 +105,48 @@ class TestRailSync:
         self.suite_id = suite_id
         self.sections_cache = None
         self.md = MarkdownFormatter()
+        self.pr_id = self._extract_pr_id_from_branch()
+    
+    @staticmethod
+    def _extract_pr_id_from_branch() -> Optional[str]:
+        """Extraer PR ID del nombre de la rama actual"""
+        try:
+            # Obtener nombre de la rama actual
+            result = subprocess.run(
+                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                branch_name = result.stdout.strip()
+                print(f"✓ Rama actual: {branch_name}")
+                
+                # Patrones comunes para PR IDs:
+                # PR-123, PR123, issue-456, #789, worktree-2026-01-22T20-57-31, etc
+                patterns = [
+                    r'PR[#-]?(\d+)',      # PR-123 o PR#123
+                    r'issue[#-]?(\d+)',   # issue-456
+                    r'#(\d+)',            # #789
+                ]
+                
+                for pattern in patterns:
+                    match = re.search(pattern, branch_name, re.IGNORECASE)
+                    if match:
+                        pr_id = match.group(1)
+                        print(f"✓ PR ID extraído: {pr_id}")
+                        return pr_id
+                
+                # Si no encuentra patrón, usar todo después del última /
+                pr_id = branch_name.split('/')[-1]
+                print(f"✓ PR ID (rama completa): {pr_id}")
+                return pr_id
+        
+        except Exception as e:
+            print(f"⚠️ No se pudo extraer PR ID de rama: {e}")
+        
+        return None
     
     def sync_cases_from_karate(self, test_results: List[TestResult]) -> dict[str, int]:
         """
@@ -176,6 +221,9 @@ class TestRailSync:
         steps = self._build_steps(result)
         expected_result = self._build_expected_result(result)
         
+        # ✅ Convertir tags a labels (comma-separated)
+        labels = ",".join(result.tags) if result.tags else ""
+        
         case_data = {
             'title': title,
             'custom_automation_id': automation_id,
@@ -189,9 +237,21 @@ class TestRailSync:
             'custom_status_actual': result.status,
         }
         
+        # ✅ Agregar labels si existen
+        if labels:
+            case_data['labels'] = labels
+        
+        # ✅ Agregar references con PR ID de la rama
+        if self.pr_id:
+            case_data['refs'] = self.pr_id
+        
         # Debug: mostrar payload
         print(f"📋 Payload para caso: {automation_id}")
         print(f"   custom_preconds valor: {preconditions[:100]}...")
+        if labels:
+            print(f"   labels: {labels}")
+        if self.pr_id:
+            print(f"   refs (PR ID): {self.pr_id}")
         
         # NO incluir estimate - TestRail es muy quisquilloso con este campo
         

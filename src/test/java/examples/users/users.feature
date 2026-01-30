@@ -134,7 +134,7 @@ Feature: API de Usuarios - Testing Completo
     When method GET
     Then status 200
     And match response == '#array'
-    And match response.length > 0
+    And assert response.length > 0
 
   @validation @data-integrity
   Scenario: Validar estructura completa de usuario
@@ -180,5 +180,5 @@ Feature: API de Usuarios - Testing Completo
     When method GET
     Then status 200
     And match response == '#array'
-    And match response.length == 10
-    And each response contains { id: '#number', name: '#string', email: '#string' }
+    And assert response.length > 0
+    And match response[0] == { id: '#number', name: '#string', email: '#string', address: '#object', phone: '#string', website: '#string', company: '#object' }

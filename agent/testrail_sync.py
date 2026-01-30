@@ -221,9 +221,6 @@ class TestRailSync:
         steps = self._build_steps(result)
         expected_result = self._build_expected_result(result)
         
-        # ✅ Convertir tags a labels (comma-separated)
-        labels = ",".join(result.tags) if result.tags else ""
-        
         case_data = {
             'title': title,
             'custom_automation_id': automation_id,
@@ -237,23 +234,20 @@ class TestRailSync:
             'custom_status_actual': result.status,
         }
         
-        # ✅ Agregar labels si existen
-        if labels:
-            case_data['labels'] = labels
-        
-        # ✅ Agregar references con PR ID de la rama
+        # ✅ Agregar references con PR ID de la rama (si existe)
         if self.pr_id:
             case_data['refs'] = self.pr_id
         
         # Debug: mostrar payload
         print(f"📋 Payload para caso: {automation_id}")
         print(f"   custom_preconds valor: {preconditions[:100]}...")
-        if labels:
-            print(f"   labels: {labels}")
+        if result.tags:
+            print(f"   tags: {','.join(result.tags)}")
         if self.pr_id:
             print(f"   refs (PR ID): {self.pr_id}")
         
-        # NO incluir estimate - TestRail es muy quisquilloso con este campo
+        # NOTA: 'labels' no es soportado por TestRail API en add_case
+        # Los tags se guardan en description y custom fields en lugar de labels
         
         return case_data
     

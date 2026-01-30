@@ -233,6 +233,44 @@ class TestRailSync:
             print(f"⚠️ Error searching for case {automation_id}: {e}")
             return None
     
+    def _get_assigned_user_id(self) -> Optional[int]:
+        """👤 Obtener ID del usuario asignado (usando email - más legible)"""
+        # 1️⃣ Intentar obtener email desde env vars
+        github_email = os.getenv('GITHUB_EMAIL') or os.getenv('GITHUB_ACTOR_EMAIL')
+        testrail_email = os.getenv('TESTRAIL_ASSIGNED_EMAIL')  # Email específico de TestRail
+        
+        email_to_find = testrail_email or github_email
+        
+        if email_to_find:
+            print(f"✓ Buscando usuario por email: {email_to_find}")
+            try:
+                users = self.client.get_users()
+                for user in users:
+                    user_email = user.get('email', '').lower()
+                    if user_email == email_to_find.lower():
+                        user_id = user.get('id')
+                        user_name = user.get('name', email_to_find)
+                        print(f"✓ Usuario encontrado: {user_name} ({email_to_find}) → ID: {user_id}")
+                        return user_id
+                print(f"⚠️ Usuario con email {email_to_find} no encontrado en TestRail")
+            except Exception as e:
+                print(f"⚠️ Error buscando usuario por email: {e}")
+        
+        # 2️⃣ Fallback: obtener ID directo si está configurado
+        testrail_user_id = os.getenv('TESTRAIL_USER_ID')
+        if testrail_user_id:
+            try:
+                user_id = int(testrail_user_id)
+                print(f"✓ Usando usuario ID configurado: {user_id}")
+                return user_id
+            except ValueError:
+                pass
+        
+        # 3️⃣ Si nada funciona, retornar None (sin asignar)
+        print(f"ℹ️ No se especificó usuario - los casos no serán asignados")
+        print(f"   Configura: TESTRAIL_ASSIGNED_EMAIL='tu@email.com'")
+        return None
+    
     def _build_case_data(self, result: TestResult, automation_id: str, title: str) -> dict:
         """Build TestRail case payload with all formatted fields"""
         priority = self._infer_priority(result)
@@ -243,6 +281,7 @@ class TestRailSync:
         
         case_data = {
             'title': title,
+            'type_id': 1,  # 🎯 Type: Functional (automated test)
             'custom_automation_id': automation_id,
             'description': description,
             'custom_preconds': preconditions,
@@ -250,8 +289,9 @@ class TestRailSync:
             'custom_expected': expected_result,
             'priority_id': priority,
             'custom_feature': result.feature,
-            'custom_is_automated': 1,
+            'custom_is_automated': True,  # ✅ Marcar como automatizado
             'custom_status_actual': result.status,
+            'assigned_to_id': self._get_assigned_user_id(),  # 👤 Asignar a usuario actual
         }
         
         # ✅ Agregar references con PR ID de la rama (si existe)

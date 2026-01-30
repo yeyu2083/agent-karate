@@ -6,6 +6,7 @@ Sync Karate test cases to TestRail with premium visual formatting
 
 import os
 import re
+import json
 import subprocess
 from typing import Optional, List
 from enum import Enum
@@ -234,15 +235,32 @@ class TestRailSync:
             return None
     
     def _get_assigned_user_id(self) -> Optional[int]:
-        """👤 Obtener ID del usuario asignado (usando email - más legible)"""
-        # 1️⃣ Intentar obtener email desde env vars
-        github_email = os.getenv('GITHUB_EMAIL') or os.getenv('GITHUB_ACTOR_EMAIL')
-        testrail_email = os.getenv('TESTRAIL_ASSIGNED_EMAIL')  # Email específico de TestRail
+        """👤 Obtener ID del usuario asignado (email desde config o env vars)"""
+        email_to_find = None
         
-        email_to_find = testrail_email or github_email
+        # 1️⃣ Intentar obtener del testrail.config.json (PRIORITARIO)
+        try:
+            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'testrail.config.json')
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    email_to_find = config.get('qa', {}).get('assigned_email')
+                    user_name = config.get('qa', {}).get('assigned_name', 'QA Lead')
+                    if email_to_find and email_to_find != 'tu@email.com':
+                        print(f"✓ Email de config.json: {email_to_find} ({user_name})")
+        except Exception as e:
+            print(f"⚠️ No se pudo leer config.json: {e}")
         
-        if email_to_find:
-            print(f"✓ Buscando usuario por email: {email_to_find}")
+        # 2️⃣ Fallback: env vars
+        if not email_to_find:
+            email_to_find = os.getenv('TESTRAIL_ASSIGNED_EMAIL') or \
+                           os.getenv('GITHUB_EMAIL') or \
+                           os.getenv('GITHUB_ACTOR_EMAIL')
+            if email_to_find:
+                print(f"✓ Email de env var: {email_to_find}")
+        
+        # 3️⃣ Buscar usuario en TestRail por email
+        if email_to_find and email_to_find != 'tu@email.com':
             try:
                 users = self.client.get_users()
                 for user in users:
@@ -250,25 +268,25 @@ class TestRailSync:
                     if user_email == email_to_find.lower():
                         user_id = user.get('id')
                         user_name = user.get('name', email_to_find)
-                        print(f"✓ Usuario encontrado: {user_name} ({email_to_find}) → ID: {user_id}")
+                        print(f"✓ Usuario encontrado en TestRail: {user_name} ({email_to_find}) → ID: {user_id}")
                         return user_id
                 print(f"⚠️ Usuario con email {email_to_find} no encontrado en TestRail")
             except Exception as e:
                 print(f"⚠️ Error buscando usuario por email: {e}")
+        else:
+            print(f"ℹ️ No se especificó usuario - los casos no serán asignados")
+            print(f"   Configura en testrail.config.json: 'qa.assigned_email'")
         
-        # 2️⃣ Fallback: obtener ID directo si está configurado
+        # 4️⃣ Fallback: ID directo
         testrail_user_id = os.getenv('TESTRAIL_USER_ID')
         if testrail_user_id:
             try:
                 user_id = int(testrail_user_id)
-                print(f"✓ Usando usuario ID configurado: {user_id}")
+                print(f"✓ Usando usuario ID desde env: {user_id}")
                 return user_id
             except ValueError:
                 pass
         
-        # 3️⃣ Si nada funciona, retornar None (sin asignar)
-        print(f"ℹ️ No se especificó usuario - los casos no serán asignados")
-        print(f"   Configura: TESTRAIL_ASSIGNED_EMAIL='tu@email.com'")
         return None
     
     def _build_case_data(self, result: TestResult, automation_id: str, title: str) -> dict:
@@ -281,7 +299,7 @@ class TestRailSync:
         
         case_data = {
             'title': title,
-            'type_id': 1,  # 🎯 Type: Functional (automated test)
+            'type_id': 2,  # 🎯 Type: 2 = Functional (1 = Acceptance, 2 = Functional, 3 = Regression)
             'custom_automation_id': automation_id,
             'description': description,
             'custom_preconds': preconditions,
@@ -289,7 +307,7 @@ class TestRailSync:
             'custom_expected': expected_result,
             'priority_id': priority,
             'custom_feature': result.feature,
-            'custom_is_automated': True,  # ✅ Marcar como automatizado
+            'custom_is_automated': 1,  # ✅ Marcar como automatizado (1 = true, 0 = false)
             'custom_status_actual': result.status,
             'assigned_to_id': self._get_assigned_user_id(),  # 👤 Asignar a usuario actual
         }

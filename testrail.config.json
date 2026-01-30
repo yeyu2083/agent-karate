@@ -4,6 +4,10 @@
     "suite_id": 6,
     "environment": "dev"
   },
+  "qa": {
+    "assigned_email": "ywindecker@gmail.com",
+    "assigned_name": "Yesica Windecker"
+  },
   "karate": {
     "results_path": "target/karate-reports/karate-summary.json"
   },

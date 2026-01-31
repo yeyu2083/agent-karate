@@ -407,6 +407,9 @@ def main():
                 risk_level = "CRITICAL"
             
             # Enviar a Slack
+            # Limpiar AI feedback para Slack (remover markdown)
+            clean_feedback = ai_feedback.replace("## ", "").replace("# ", "").replace("markdown", "").strip()
+            
             slack.send_results(
                 pass_rate=pass_rate,
                 total_tests=total,
@@ -420,7 +423,7 @@ def main():
                 github_actor=github_actor,
                 commit_sha=commit_sha,
                 pr_number=pr_number,
-                ai_comment=ai_feedback[:500] if ai_feedback else None,
+                ai_comment=clean_feedback[:500] if clean_feedback else None,
                 ai_blockers=ai_insights.get("blockers", []),
                 ai_recommendations=ai_insights.get("recommendations", []),
             )

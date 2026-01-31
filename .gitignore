@@ -9,6 +9,11 @@ testrail-dashboard.html
 testrail-run-data.json
 testrail-output.log
 
+# Environment variables (NEVER commit real secrets)
+.env
+.env.local
+.env.*.local
+
 # IDE
 .idea/
 *.iml

@@ -353,4 +353,53 @@ class TestRailClient:
                 return response.json()
         except Exception as e:
             print(f"❌ Error adding attachment: {e}")
-            return None
+            return None    
+    # ===== Users Management =====
+    def get_users(self) -> List[Dict[str, Any]]:
+        """👤 GET /get_users - Obtener lista de usuarios en TestRail"""
+        url = f"{self.base_url}/get_users"
+        try:
+            response = requests.get(url, auth=self.auth, headers=self.headers)
+            response.raise_for_status()
+            data = response.json()
+            # TestRail API v2 wraps results
+            if isinstance(data, dict) and 'users' in data:
+                return data['users']
+            if isinstance(data, dict):
+                return list(data.values())
+            return data if isinstance(data, list) else []
+        except Exception as e:
+            print(f"⚠️ Error getting users list: {e}")
+            return []
+    
+    def get_case_types(self) -> List[Dict[str, Any]]:
+        """Get available case types"""
+        url = f"{self.base_url}/get_case_types"
+        try:
+            response = requests.get(url, auth=self.auth, headers=self.headers)
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict) and 'types' in data:
+                return data['types']
+            return []
+        except Exception as e:
+            print(f"⚠️ Error getting case types: {e}")
+            return []
+
+    def get_case_types(self) -> List[Dict[str, Any]]:
+        """���️ GET /get_case_types - Obtener tipos de casos disponibles"""
+        url = f"{self.base_url}/get_case_types"
+        try:
+            response = requests.get(url, auth=self.auth, headers=self.headers)
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict) and 'types' in data:
+                return data['types']
+            return []
+        except Exception as e:
+            print(f"⚠️ Error getting case types: {e}")
+            return []

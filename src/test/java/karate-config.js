@@ -8,7 +8,7 @@ function fn() {
         env: env,
         // URLs base para diferentes ambientes
         baseUrl: 'https://jsonplaceholder.typicode.com',
-        apiUrl: 'https://reqres.in/api',
+        apiUrl: 'https://jsonplaceholder.typicode.com',
         timeout: 10000, // timeout en milisegundos
 
         // Headers que imitan un navegador real (anti-Cloudflare)

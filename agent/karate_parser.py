@@ -14,13 +14,32 @@ class KarateParser:
         """Pre-cargar todos los archivos .feature y extraer sus backgrounds"""
         if not feature_dir:
             # Buscar por defecto en src/test/java/examples
-            feature_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'test', 'java', 'examples')
+            # Probar varias rutas posibles
+            possible_paths = [
+                os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'test', 'java', 'examples'),
+                os.path.join(os.getcwd(), 'src', 'test', 'java', 'examples'),
+                os.path.join(os.getcwd(), 'agent-karate', 'src', 'test', 'java', 'examples'),
+                '/app/src/test/java/examples',  # Docker
+                'C:\\Users\\Yeyu\\laboratorioDexter\\agent-karate\\agent-karate\\src\\test\\java\\examples'  # Desarrollo
+            ]
+            
+            for path in possible_paths:
+                if os.path.exists(path):
+                    feature_dir = path
+                    print(f"✓ Found feature directory: {feature_dir}")
+                    break
+        
+        if not feature_dir:
+            print(f"⚠️ Feature directory not found in any location")
+            return
         
         feature_dir = os.path.abspath(feature_dir)
         
         if not os.path.exists(feature_dir):
             print(f"⚠️ Feature directory not found: {feature_dir}")
             return
+        
+        print(f"📁 Loading features from: {feature_dir}")
         
         # Buscar todos los archivos .feature
         for root, dirs, files in os.walk(feature_dir):
@@ -34,6 +53,10 @@ class KarateParser:
                         
                         if background_steps:
                             print(f"✓ Loaded background from {file}: {len(background_steps)} steps")
+                            for step in background_steps:
+                                print(f"    - {step}")
+                        else:
+                            print(f"⚠️ No background found in {file}")
                     except Exception as e:
                         print(f"⚠️ Error reading feature file {file_path}: {e}")
     
@@ -87,6 +110,23 @@ class KarateParser:
             if not data:
                 print(f"No data found in Karate JSON file: {file_path}")
                 return results
+            
+            # Estructura 0: allScenarios (formato combinado - todos los features juntos)
+            if isinstance(data, dict) and 'allScenarios' in data:
+                print("✓ Detected combined format with allScenarios")
+                all_scenarios = data.get('allScenarios', [])
+                
+                if isinstance(all_scenarios, list):
+                    for scenario in all_scenarios:
+                        # Obtener nombre de feature desde el scenario o del archivo
+                        feature_name = scenario.get('featureName', 'Unknown Feature')
+                        result = KarateParser._parse_scenario_result(scenario, feature_name)
+                        if result:
+                            results.append(result)
+                    
+                    if results:
+                        print(f"✓ Successfully parsed {len(results)} test results from allScenarios")
+                        return results
             
             # Estructura 1: scenarioResults (nuevo formato detallado)
             if isinstance(data, dict) and 'scenarioResults' in data:
@@ -186,7 +226,16 @@ class KarateParser:
             
             # Extraer pasos del Gherkin
             gherkin_steps = KarateParser._extract_gherkin_steps_from_result(scenario)
-            background_steps = []  # No disponible en este formato
+            
+            # ✅ Extraer Background steps de stepResults
+            background_steps = KarateParser._extract_background_steps(scenario)
+            
+            # ✅ Extraer Tags
+            tags = scenario.get('tags', [])
+            
+            # ✅ Extraer Example Index (si es Scenario Outline)
+            example_index = scenario.get('exampleIndex', -1)
+            
             prerequisites = []  # No disponible en este formato
             expected_assertions = KarateParser._extract_expected_assertions_from_result(scenario)
             examples = []
@@ -202,7 +251,9 @@ class KarateParser:
                 background_steps=background_steps,
                 prerequisites=prerequisites,
                 expected_assertions=expected_assertions,
-                examples=examples
+                examples=examples,
+                tags=tags,
+                example_index=example_index
             )
         except Exception as e:
             print(f"⚠️ Error parsing scenario: {e}")
@@ -370,43 +421,45 @@ class KarateParser:
         return steps
     
     @staticmethod
-    def _extract_background_steps(feature: Dict) -> List[str]:
-        """Extraer pasos del Background de la feature"""
+    def _extract_background_steps(scenario: Dict) -> List[str]:
+        """Extraer pasos del Background del scenario JSON de Karate"""
         steps = []
         
-        # Primero intentar obtener del cache (de archivos .feature en bruto)
-        feature_name = feature.get('name', '')
-        if feature_name:
-            # Intentar diferentes variaciones del nombre
-            # 1. Nombre exacto
-            cached = KarateParser.get_background_for_feature(feature_name)
-            if cached:
-                print(f"✓ Background encontrado para: {feature_name}")
-                return cached
-            
-            # 2. Usar la primera palabra del nombre de feature (ej: "API de Posts..." → "posts")
-            # Extraer última palabra antes de "Pruebas" o similar
-            words = feature_name.lower().split()
-            for word in reversed(words):
-                if word and word not in ['de', 'api', 'testing', 'pruebas', 'completo', 'para']:
-                    cached = KarateParser.get_background_for_feature(word)
-                    if cached:
-                        print(f"✓ Background encontrado para: {word} (from {feature_name})")
-                        return cached
-        
-        # Si no está en cache, extraer del JSON
         try:
-            background = feature.get('background')
-            if background and isinstance(background, dict):
-                background_steps = background.get('steps', [])
-                for step in background_steps:
-                    if isinstance(step, dict):
-                        keyword = step.get('keyword', '').strip()  # Given, And, etc
-                        text = step.get('text', '').strip()
-                        if keyword and text:
-                            steps.append(f"{keyword} {text}")
+            # Los pasos del Background están en stepResults con "background": true
+            step_results = scenario.get('stepResults', [])
+            if isinstance(step_results, list):
+                for step_result in step_results:
+                    if isinstance(step_result, dict):
+                        step_info = step_result.get('step', {})
+                        if isinstance(step_info, dict) and step_info.get('background'):
+                            prefix = step_info.get('prefix', '').strip()  # * en Karate
+                            text = step_info.get('text', '').strip()
+                            if prefix and text:
+                                # Formatear: "* url baseUrl" o "* header ..."
+                                steps.append(f"{prefix} {text}")
+                
+                if steps:
+                    print(f"✓ Background extraído de stepResults: {len(steps)} steps")
+                    for step in steps:
+                        print(f"    - {step}")
+            
+            # Fallback: si no hay pasos con background=true, intentar obtener del objeto background
+            if not steps:
+                background = scenario.get('background')
+                if background and isinstance(background, dict):
+                    background_steps = background.get('steps', [])
+                    if isinstance(background_steps, list):
+                        for step in background_steps:
+                            if isinstance(step, dict):
+                                keyword = step.get('keyword', '').strip()
+                                text = step.get('text', '').strip()
+                                if keyword and text:
+                                    steps.append(f"{keyword} {text}")
+        
         except Exception as e:
-            pass
+            print(f"Error extrayendo background: {e}")
+        
         return steps
     
     @staticmethod

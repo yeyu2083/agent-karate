@@ -9,6 +9,11 @@ testrail-dashboard.html
 testrail-run-data.json
 testrail-output.log
 
+# Environment variables (NEVER commit real secrets)
+.env
+.env.local
+.env.*.local
+
 # IDE
 .idea/
 *.iml
@@ -26,6 +31,18 @@ Thumbs.db
 *.jar
 *.war
 *.ear
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
 
 # Test Results
 test-output/

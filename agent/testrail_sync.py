@@ -4,6 +4,10 @@ TestRail Synchronization - ENHANCED VERSION v2
 Sync Karate test cases to TestRail with premium visual formatting
 """
 
+import os
+import re
+import json
+import subprocess
 from typing import Optional, List
 from enum import Enum
 from .testrail_client import TestRailClient
@@ -102,6 +106,83 @@ class TestRailSync:
         self.suite_id = suite_id
         self.sections_cache = None
         self.md = MarkdownFormatter()
+        self.pr_id = self._extract_pr_id_from_branch()
+        self.automated_type_id = self._get_automated_type_id()  # 🤖 Obtener ID del tipo "Automated"
+    
+    @staticmethod
+    def _extract_pr_id_from_branch() -> Optional[str]:
+        """Extraer PR ID desde GitHub Actions env vars o rama actual"""
+        # 🎯 Primero: intentar obtener del contexto de GitHub Actions
+        github_pr_id = os.getenv('GITHUB_HEAD_REF')  # Para pull_request events
+        if github_pr_id:
+            print(f"✓ PR ID desde GitHub context: {github_pr_id}")
+            return github_pr_id
+        
+        # 🎯 Alternativa: usar GITHUB_REF si es un PR
+        github_ref = os.getenv('GITHUB_REF', '')
+        if 'pull' in github_ref:
+            # Ej: refs/pull/123/merge -> extraer 123
+            try:
+                pr_match = re.search(r'/pull/(\d+)/', github_ref)
+                if pr_match:
+                    pr_id = pr_match.group(1)
+                    print(f"✓ PR ID desde GITHUB_REF: {pr_id}")
+                    return pr_id
+            except Exception as e:
+                print(f"⚠️ No se pudo extraer PR ID de GITHUB_REF: {e}")
+        
+        # Fallback: extraer del nombre de la rama
+        try:
+            result = subprocess.run(
+                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                branch_name = result.stdout.strip()
+                print(f"✓ Rama actual: {branch_name}")
+                
+                # Patrones comunes para PR IDs:
+                # PR-123, PR123, issue-456, #789, SCRUM-4, etc
+                patterns = [
+                    r'PR[#-]?(\d+)',      # PR-123 o PR#123
+                    r'issue[#-]?(\d+)',   # issue-456
+                    r'#(\d+)',            # #789
+                    r'([A-Z]+-\d+)',      # SCRUM-4, JIRA-123
+                ]
+                
+                for pattern in patterns:
+                    match = re.search(pattern, branch_name, re.IGNORECASE)
+                    if match:
+                        pr_id = match.group(1)
+                        print(f"✓ ID extraído de rama: {pr_id}")
+                        return pr_id
+                
+                # Si no encuentra patrón, usar todo después del última /
+                pr_id = branch_name.split('/')[-1]
+                print(f"✓ ID (rama): {pr_id}")
+                return pr_id
+        
+        except Exception as e:
+            print(f"⚠️ No se pudo extraer ID de rama: {e}")
+        
+        return None
+    
+    def _get_automated_type_id(self) -> Optional[int]:
+        """🤖 Obtener el ID del tipo de caso 'Automated'"""
+        try:
+            types = self.client.get_case_types()
+            for case_type in types:
+                if case_type.get('name', '').lower() == 'automated':
+                    type_id = case_type.get('id')
+                    print(f"✓ Tipo 'Automated' encontrado: ID={type_id}")
+                    return type_id
+            print(f"⚠️ Tipo 'Automated' no encontrado en TestRail")
+        except Exception as e:
+            print(f"⚠️ Error obteniendo tipos de casos: {e}")
+        return None
     
     def sync_cases_from_karate(self, test_results: List[TestResult]) -> dict[str, int]:
         """
@@ -143,8 +224,24 @@ class TestRailSync:
                 if section_id:
                     created = self.client.add_case(section_id, case_data)
                     if created:
-                        print(f"✓ Created case #{created['id']}: {automation_id}")
-                        case_map[automation_id] = created['id']
+                        case_id = created['id']
+                        print(f"✓ Created case #{case_id}: {automation_id}")
+                        
+                        # 🔄 Actualizar campos que solo funcionan en update_case
+                        update_data = {}
+                        if self.automated_type_id:
+                            update_data['type_id'] = self.automated_type_id
+                        if case_data.get('is_automated'):
+                            update_data['is_automated'] = 1  # ✅ Usar 1 en lugar de True
+                        user_id = case_data.get('assigned_to_id')
+                        if user_id:
+                            update_data['assigned_to_id'] = user_id
+                        
+                        if update_data:
+                            self.client.update_case(case_id, update_data)
+                            print(f"  ✓ Updated fields: {list(update_data.keys())}")
+                        
+                        case_map[automation_id] = case_id
                 else:
                     print(f"⚠️ Cannot create case without section_id: {automation_id}")
         
@@ -168,6 +265,64 @@ class TestRailSync:
             print(f"⚠️ Error searching for case {automation_id}: {e}")
             return None
     
+    def _get_assigned_user_id(self) -> Optional[int]:
+        """👤 Obtener ID del usuario asignado (email desde config o env vars)"""
+        email_to_find = None
+        
+        # 1️⃣ Intentar obtener del testrail.config.json (PRIORITARIO)
+        try:
+            # Ruta correcta: agent/__file__ → agent/ → parent (agent-karate/) → testrail.config.json
+            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'testrail.config.json')
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    email_to_find = config.get('qa', {}).get('assigned_email')
+                    user_name = config.get('qa', {}).get('assigned_name', 'QA Lead')
+                    if email_to_find and email_to_find != 'tu@email.com':
+                        print(f"✓ Email de config.json: {email_to_find} ({user_name})")
+            else:
+                print(f"⚠️ Config file no encontrado en: {config_path}")
+        except Exception as e:
+            print(f"⚠️ No se pudo leer config.json: {e}")
+        
+        # 2️⃣ Fallback: env vars
+        if not email_to_find:
+            email_to_find = os.getenv('TESTRAIL_ASSIGNED_EMAIL') or \
+                           os.getenv('GITHUB_EMAIL') or \
+                           os.getenv('GITHUB_ACTOR_EMAIL')
+            if email_to_find:
+                print(f"✓ Email de env var: {email_to_find}")
+        
+        # 3️⃣ Buscar usuario en TestRail por email
+        if email_to_find and email_to_find != 'tu@email.com':
+            try:
+                users = self.client.get_users()
+                for user in users:
+                    user_email = user.get('email', '').lower()
+                    if user_email == email_to_find.lower():
+                        user_id = user.get('id')
+                        user_name = user.get('name', email_to_find)
+                        print(f"✓ Usuario encontrado en TestRail: {user_name} ({email_to_find}) → ID: {user_id}")
+                        return user_id
+                print(f"⚠️ Usuario con email {email_to_find} no encontrado en TestRail")
+            except Exception as e:
+                print(f"⚠️ Error buscando usuario por email: {e}")
+        else:
+            print(f"ℹ️ No se especificó usuario - los casos no serán asignados")
+            print(f"   Configura en testrail.config.json: 'qa.assigned_email'")
+        
+        # 4️⃣ Fallback: ID directo
+        testrail_user_id = os.getenv('TESTRAIL_USER_ID')
+        if testrail_user_id:
+            try:
+                user_id = int(testrail_user_id)
+                print(f"✓ Usando usuario ID desde env: {user_id}")
+                return user_id
+            except ValueError:
+                pass
+        
+        return None
+    
     def _build_case_data(self, result: TestResult, automation_id: str, title: str) -> dict:
         """Build TestRail case payload with all formatted fields"""
         priority = self._infer_priority(result)
@@ -175,9 +330,11 @@ class TestRailSync:
         preconditions = self._build_preconditions(result)
         steps = self._build_steps(result)
         expected_result = self._build_expected_result(result)
+        assigned_user_id = self._get_assigned_user_id()
         
         case_data = {
             'title': title,
+            'type_id': self.automated_type_id,  # 🤖 Tipo Automated
             'custom_automation_id': automation_id,
             'description': description,
             'custom_preconds': preconditions,
@@ -185,15 +342,28 @@ class TestRailSync:
             'custom_expected': expected_result,
             'priority_id': priority,
             'custom_feature': result.feature,
-            'custom_is_automated': 1,
             'custom_status_actual': result.status,
         }
         
-        # Debug: mostrar payload
-        print(f"📋 Payload para caso: {automation_id}")
-        print(f"   custom_preconds valor: {preconditions[:100]}...")
+        # 👤 Agregar usuario asignado si se encontró
+        if assigned_user_id:
+            case_data['assigned_to_id'] = assigned_user_id
         
-        # NO incluir estimate - TestRail es muy quisquilloso con este campo
+        # 🏷️ Agregar solo tags a references (para filtrar en TestRail)
+        if result.tags:
+            case_data['refs'] = ', '.join([f"@{tag}" for tag in result.tags])
+        
+        # Debug: mostrar payload COMPLETO
+        print(f"📋 Payload completo para caso: {automation_id}")
+        print(f"   Fields enviados por API:")
+        for key, value in case_data.items():
+            if key.startswith('custom_preconds') or key.startswith('custom_steps'):
+                print(f"   - {key}: {str(value)[:80]}...")
+            else:
+                print(f"   - {key}: {value}")
+        
+        print(f"   ⚠️ Completa manualmente en TestRail:")
+        print(f"      • Is Automated: Sí")
         
         return case_data
     
@@ -210,6 +380,12 @@ class TestRailSync:
         # Header con emoji y feature
         md += self.md.header(f"🧪 {result.feature}", level=2)
         md += self.md.blockquote(f"**Scenario:** {result.scenario}")
+        
+        # ✅ Tags en descripción
+        if result.tags:
+            tags_str = " ".join([f"[{tag}]" for tag in result.tags])
+            md += self.md.blockquote(f"🏷️ **Tags:** {tags_str}")
+        
         md += "\n"
         
         # Stats table con más info y mejor formato
@@ -263,14 +439,12 @@ class TestRailSync:
         if result.background_steps:
             md += self.md.header("🔧 Prerequisites", level=4)
             for i, step in enumerate(result.background_steps, 1):
-                formatted = self._format_step_with_icon(step)
-                md += self.md.numbered_item(formatted, i)
+                # Mostrar exactamente como está en el código
+                md += self.md.numbered_item(step, i)
         else:
-            # Default preconditions
+            # IMPORTANTE: No usar fallback genérico - esto ayuda a identificar problemas
             md += self.md.header("🔧 Prerequisites", level=4)
-            md += self.md.numbered_item("🌐 API endpoint is accessible and responding", 1)
-            md += self.md.numbered_item("⚙️ Test environment is properly configured", 2)
-            md += self.md.numbered_item("📦 Required test data is available", 3)
+            md += self.md.blockquote("ℹ️ Background/Prerequisites not extracted from feature file")
         
         return md
     

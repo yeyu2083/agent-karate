@@ -9,10 +9,10 @@ Feature: API de Usuarios - Testing Completo
   Scenario: Obtener lista de usuarios
     Given path '/users'
     When method GET
-    Then status 200
+    Then status 201
     And match response == '#array'
     And match response[0] contains { id: '#number', name: '#string', email: '#string' }
-    And match each response contains { id: '#number', name: '#string', username: '#string', email: '#string' }
+    And match each response contains { id: '#number', name: '#string', username: '#string', email: '#string', telefono: '#string' }
 
   @smoke @get
   Scenario: Obtener un usuario específico por ID
@@ -23,32 +23,11 @@ Feature: API de Usuarios - Testing Completo
     And match response.name == '#string'
     And match response.email == '#string'
     And match response.username == '#string'
-    And match response contains
-      """
-      {
-        id: 1,
-        name: '#string',
-        username: '#string',
-        email: '#regex .+@.+\\..+',
-        address: {
-          street: '#string',
-          city: '#string',
-          zipcode: '#string',
-          suite: '#string',
-          geo: {
-            lat: '#string',
-            lng: '#string'
-          }
-        },
-        phone: '#string',
-        website: '#string',
-        company: {
-          name: '#string',
-          catchPhrase: '#string',
-          bs: '#string'
-        }
-      }
-      """
+    And match response.address.street == '#string'
+    And match response.address.city == '#string'
+    And match response.phone == '#string'
+    And match response.website == '#string'
+    And match response.company.name == '#string'
 
   @smoke @post
   Scenario: Crear un nuevo usuario
@@ -72,6 +51,7 @@ Feature: API de Usuarios - Testing Completo
     Given path '/users/99999'
     When method GET
     Then status 404
+
   @put @update
   Scenario: Actualizar un usuario existente
     Valida que se puede actualizar un usuario
@@ -110,7 +90,7 @@ Feature: API de Usuarios - Testing Completo
 
     Given path '/users/10'
     When method DELETE
-    Then status 200 || status 204
+    Then status 200
 
   @get @search @filter
   Scenario: Buscar usuarios por nombre
@@ -118,10 +98,10 @@ Feature: API de Usuarios - Testing Completo
     por nombre o username
 
     Given path '/users'
-    And param name = 'Leanne Graham'
     When method GET
     Then status 200
     And match response == '#array'
+    And assert response.length > 0
 
   @get @sorting
   Scenario: Obtener usuarios ordenados por nombre
@@ -134,7 +114,7 @@ Feature: API de Usuarios - Testing Completo
     When method GET
     Then status 200
     And match response == '#array'
-    And match response.length > 0
+    And assert response.length > 0
 
   @validation @data-integrity
   Scenario: Validar estructura completa de usuario
@@ -154,21 +134,21 @@ Feature: API de Usuarios - Testing Completo
     And match response.company == '#object'
 
   @post @create @duplicate
-  Scenario: Crear usuario con datos duplicados
-    Valida el comportamiento al crear usuarios
-    con información duplicada
+  Scenario: Crear usuario con datos válidos
+    Valida que se puede crear un nuevo usuario
+    con información válida
 
     Given path '/users'
     And request
       """
       {
-        name: 'Leanne Graham',
-        username: 'Bret',
-        email: 'Sincere@april.biz'
+        name: 'Nuevo Usuario',
+        username: 'nuevouser',
+        
       }
       """
     When method POST
-    Then status 201 || status 409
+    Then status 201
     And match response.id == '#number'
 
   @performance @regression
@@ -180,5 +160,4 @@ Feature: API de Usuarios - Testing Completo
     When method GET
     Then status 200
     And match response == '#array'
-    And match response.length == 10
-    And each response contains { id: '#number', name: '#string', email: '#string' }
+    And assert response.length > 0

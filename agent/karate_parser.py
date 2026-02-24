@@ -111,6 +111,23 @@ class KarateParser:
                 print(f"No data found in Karate JSON file: {file_path}")
                 return results
             
+            # Estructura 0: allScenarios (formato combinado - todos los features juntos)
+            if isinstance(data, dict) and 'allScenarios' in data:
+                print("✓ Detected combined format with allScenarios")
+                all_scenarios = data.get('allScenarios', [])
+                
+                if isinstance(all_scenarios, list):
+                    for scenario in all_scenarios:
+                        # Obtener nombre de feature desde el scenario o del archivo
+                        feature_name = scenario.get('featureName', 'Unknown Feature')
+                        result = KarateParser._parse_scenario_result(scenario, feature_name)
+                        if result:
+                            results.append(result)
+                    
+                    if results:
+                        print(f"✓ Successfully parsed {len(results)} test results from allScenarios")
+                        return results
+            
             # Estructura 1: scenarioResults (nuevo formato detallado)
             if isinstance(data, dict) and 'scenarioResults' in data:
                 print("✓ Detected detailed format with scenarioResults")

@@ -103,13 +103,46 @@ jobs:
             -Dkarate.outputDir=target/karate-reports \
             -DargLine="-Dfile.encoding=UTF-8" || TEST_FAILED=true
           
-          # Generate karate.json
-          if [ -f target/karate-reports/karate-summary-json.txt ]; then
-            cp target/karate-reports/karate-summary-json.txt karate.json
-            echo "✓ Karate report copied to root"
-          else
-            cp target/karate-reports/karate.json . 2>/dev/null || echo "⚠️ No Karate report found"
-          fi
+          # Combine all *.karate-json.txt files into one
+          echo "📦 Combining all Karate results..."
+          python3 << 'EOF'
+          import json
+          import glob
+          import os
+          
+          # Find all .karate-json.txt files
+          report_dir = "target/karate-reports"
+          all_results = {"allScenarios": []}
+          
+          karate_files = glob.glob(os.path.join(report_dir, "*.karate-json.txt"))
+          karate_files = [f for f in karate_files if not f.endswith("karate-summary-json.txt")]
+          
+          print(f"✓ Found {len(karate_files)} feature files:")
+          
+          for karate_file in sorted(karate_files):
+              print(f"  - {os.path.basename(karate_file)}")
+              try:
+                  with open(karate_file, 'r', encoding='utf-8') as f:
+                      data = json.load(f)
+                      
+                  # Extract scenarios from this feature
+                  if 'scenarioResults' in data:
+                      scenarios = data.get('scenarioResults', [])
+                      feature_name = data.get('name', os.path.basename(karate_file))
+                      
+                      for scenario in scenarios:
+                          scenario['featureName'] = feature_name
+                          all_results["allScenarios"].append(scenario)
+              except Exception as e:
+                  print(f"⚠️ Error reading {karate_file}: {e}")
+          
+          # Save combined results
+          output_file = "karate.json"
+          with open(output_file, 'w', encoding='utf-8') as f:
+              json.dump(all_results, f)
+          
+          print(f"✓ Combined {len(all_results['allScenarios'])} scenarios into {output_file}")
+          EOF
           
           if [ "$TEST_FAILED" = "true" ]; then
             echo "⚠️ Some tests failed (continuing to report)"

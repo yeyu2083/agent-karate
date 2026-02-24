@@ -6,64 +6,79 @@ on:
     workflows: ["Karate → TestRail (Config-Driven)"]
     types: [completed]
 
+permissions:
+  pull-requests: write
+  contents: read
+
 jobs:
   auto-approve:
     runs-on: ubuntu-latest
-    # Solo aprobar si el workflow anterior fue exitoso y el PR no está en draft
+    # Solo aprobar si el workflow anterior fue exitoso
     if: github.event.workflow_run.conclusion == 'success'
     
     steps:
-      - name: "Get PR info"
-        id: pr_info
+      - name: "Find and approve PR"
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            // Get the triggering workflow run
+            const workflowRun = context.payload.workflow_run;
+            const branch = workflowRun.head_branch;
+            
+            console.log(`🔍 Looking for PR on branch: ${branch}`);
+            
+            // Find the PR associated with this workflow run
             const { data: pullRequests } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              head: context.payload.workflow_run.head_branch
+              head: `${context.repo.owner}:${branch}`
             });
             
-            if (pullRequests.length > 0) {
-              console.log('✓ PR encontrado');
-              console.log(`PR Number: ${pullRequests[0].number}`);
-              return pullRequests[0].number;
-            } else {
+            if (pullRequests.length === 0) {
               console.log('⚠️ No PR encontrado para esta rama');
-              return null;
-            }
-      
-      - name: "Auto-approve PR"
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prs = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head: '${{ github.event.workflow_run.head_branch }}'
-            });
-            
-            if (prs.data.length === 0) {
-              console.log('⚠️ No PR encontrado');
               return;
             }
             
-            const pr = prs.data[0];
+            const pr = pullRequests[0];
+            const prNumber = pr.number;
+            
+            console.log(`✓ PR #${prNumber} encontrado`);
             
             if (pr.draft) {
-              console.log('⏭️  PR en draft - no se aprueba');
+              console.log('⏭️ PR está en draft - no se aprueba');
+              return;
+            }
+            
+            // Check if already approved by us
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+            
+            const botApproved = reviews.some(review => 
+              review.state === 'APPROVED' && review.user.type === 'Bot'
+            );
+            
+            if (botApproved) {
+              console.log('✓ PR ya fue aprobado por el bot');
               return;
             }
             
             // Crear aprobación
-            await github.rest.pulls.createReview({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.number,
-              event: 'APPROVE',
-              body: '✅ **Aprobado automáticamente**\n\n🔧 Pipeline de tests **`Karate → TestRail`** ejecutado exitosamente\n\n✓ Todos los checks pasaron\n✓ Listo para mergear'
-            });
-            
-            console.log(`✓ PR #${pr.number} aprobado automáticamente`);
+            try {
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                event: 'APPROVE',
+                body: '✅ **Aprobado automáticamente**\n\n🔧 Pipeline **`Karate → TestRail`** ejecutado exitosamente\n\n✓ Todos los checks pasaron\n✓ Listo para mergear'
+              });
+              
+              console.log(`✓ PR #${prNumber} aprobado automáticamente`);
+            } catch (error) {
+              console.error(`❌ Error al aprobar PR: ${error.message}`);
+              throw error;
+            }

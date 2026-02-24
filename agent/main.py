@@ -62,11 +62,26 @@ def find_karate_results() -> str:
     # Get the project root (parent of agent/)
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
-    # Primero buscar archivos detallados .karate-json.txt
     print(f"📍 Searching in: {project_root}")
-    print("   Looking for detailed scenario files (.karate-json.txt):")
     
     import glob
+    
+    # ✅ PRIORITY 1: Look for combined karate.json (all features merged)
+    print("   Looking for combined karate.json (priority):")
+    combined_paths = [
+        os.path.join(project_root, "karate.json"),
+        os.path.join(project_root, "target/karate-reports/karate.json"),
+    ]
+    
+    for path in combined_paths:
+        exists = "✓" if os.path.exists(path) else "✗"
+        print(f"   {exists} {path}")
+        if os.path.exists(path):
+            print(f"✅ Found COMBINED Karate results (with allScenarios): {path}")
+            return path
+    
+    # ✅ PRIORITY 2: Look for individual detailed scenario files (.karate-json.txt)
+    print("   Looking for detailed scenario files (.karate-json.txt):")
     detailed_patterns = [
         os.path.join(project_root, "target/karate-reports/*.karate-json.txt"),
         os.path.join(project_root, "src/test/java/target/karate-reports/*.karate-json.txt"),
@@ -75,26 +90,25 @@ def find_karate_results() -> str:
     for pattern in detailed_patterns:
         matches = glob.glob(pattern)
         for match in matches:
-            print(f"   ✓ {match}")
-            if os.path.exists(match):
-                print(f"✓ Found detailed Karate results: {match}")
-                return match
+            if "karate-summary" not in match:
+                print(f"   ✓ {match}")
+                if os.path.exists(match):
+                    print(f"⚠️ Found individual Karate results (fallback): {match}")
+                    return match
     
-    # Fallback a archivos summary
+    # ✅ PRIORITY 3: Fallback to summary files
     print("   Falling back to summary files:")
     paths = [
-        os.path.join(project_root, "karate.json"),
-        os.path.join(project_root, "target/karate-reports/karate.json"),
         os.path.join(project_root, "target/karate-reports/karate-summary.json"),
         os.path.join(project_root, "target/karate-reports/karate-summary-json.txt"),
-        os.path.join(project_root, "src/test/java/target/karate-reports/karate.json"),
+        os.path.join(project_root, "src/test/java/target/karate-reports/karate-summary.json"),
     ]
     
     for i, path in enumerate(paths, 1):
         exists = "✓" if os.path.exists(path) else "✗"
         print(f"   {i}. {exists} {path}")
         if os.path.exists(path):
-            print(f"✓ Found Karate results: {path}")
+            print(f"✓ Found Karate summary: {path}")
             return path
     
     print(f"❌ No Karate results file found")

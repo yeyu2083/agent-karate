@@ -185,12 +185,14 @@ jobs:
             const fs = require('fs');
             let reportData = null;
             let markdown = '';
+            let aiFeeback = '';
             
             // Try to read the report data file
             try {
               const rawData = fs.readFileSync('testrail-run-data.json', 'utf8');
               reportData = JSON.parse(rawData);
               markdown = reportData.markdown;
+              aiFeeback = reportData.ai_feedback || '';
             } catch (e) {
               // Fallback to parsing log
               const log = fs.readFileSync('testrail-output.log', 'utf8');
@@ -211,6 +213,12 @@ jobs:
             }
             
             comment += markdown;
+            
+            // Add AI feedback if available
+            if (aiFeeback && aiFeeback.trim().length > 0) {
+              comment += `\n\n---\n\n## 🤖 IA Insights & Feedback\n\n`;
+              comment += aiFeeback;
+            }
             
             comment += `\n\n---\n`;
             comment += `📦 [Download Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;

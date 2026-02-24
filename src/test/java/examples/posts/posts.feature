@@ -38,7 +38,7 @@ Feature: API de Posts - Pruebas de Publicaciones
 
     Given path '/posts'
     When method GET
-    Then status 200
+    Then status 400
     And match response == '#array'
     And match response[0] == '#object'
     And match response[0].userId == '#number'

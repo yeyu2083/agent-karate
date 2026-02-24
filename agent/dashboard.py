@@ -857,14 +857,15 @@ def main():
     # Crear app Gradio
     app = create_gradio_app(mongo_sync)
     
-    # Iniciar servidor
-    print("📊 Dashboard disponible en: http://localhost:7860")
+    # Iniciar servidor - leer puerto de variable de entorno
+    port = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
+    print(f"📊 Dashboard disponible en: http://localhost:{port}")
     print("   Presiona Ctrl+C para detener")
     
     try:
         app.launch(
             server_name="0.0.0.0",
-            server_port=7860,
+            server_port=port,
             share=False,
             show_error=True,
             theme=gr.themes.Soft(),

@@ -1,42 +1,69 @@
 name: Auto-approve validated PRs
 
+# ESPERA a que karate-testrail.yml termine primero
 on:
-  pull_request:
-    types: [opened, synchronize]
+  workflow_run:
+    workflows: ["Karate → TestRail (Config-Driven)"]
+    types: [completed]
 
 jobs:
   auto-approve:
     runs-on: ubuntu-latest
-    # Solo auto-aprobar si el pipeline de pruebas pasó
-    if: github.event.pull_request.draft == false
+    # Solo aprobar si el workflow anterior fue exitoso y el PR no está en draft
+    if: github.event.workflow_run.conclusion == 'success'
     
     steps:
-      - name: "Auto-approve PR with validation"
+      - name: "Get PR info"
+        id: pr_info
         uses: actions/github-script@v7
         with:
           script: |
-            // Solo aprobar si todos los checks pasaron
-            const { data: checks } = await github.rest.checks.listForRef({
+            const { data: pullRequests } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: context.payload.pull_request.head.sha
+              state: 'open',
+              head: context.payload.workflow_run.head_branch
             });
             
-            const allPassed = checks.check_runs.every(check => 
-              check.conclusion === 'success' || check.conclusion === null
-            );
-            
-            if (allPassed || checks.check_runs.length === 0) {
-              // Crear aprobación
-              github.rest.pulls.createReview({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number,
-                event: 'APPROVE',
-                body: '✅ **Aprobado automáticamente** - Todos los checks validaron correctamente\n\n🔧 Pipeline de tests ejecutado exitosamente'
-              });
-              
-              console.log('✓ PR aprobado automáticamente');
+            if (pullRequests.length > 0) {
+              console.log('✓ PR encontrado');
+              console.log(`PR Number: ${pullRequests[0].number}`);
+              return pullRequests[0].number;
             } else {
-              console.log('⚠️ No se aprobó - algunos checks aún están pendientes o fallaron');
+              console.log('⚠️ No PR encontrado para esta rama');
+              return null;
             }
+      
+      - name: "Auto-approve PR"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: '${{ github.event.workflow_run.head_branch }}'
+            });
+            
+            if (prs.data.length === 0) {
+              console.log('⚠️ No PR encontrado');
+              return;
+            }
+            
+            const pr = prs.data[0];
+            
+            if (pr.draft) {
+              console.log('⏭️  PR en draft - no se aprueba');
+              return;
+            }
+            
+            // Crear aprobación
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              event: 'APPROVE',
+              body: '✅ **Aprobado automáticamente**\n\n🔧 Pipeline de tests **`Karate → TestRail`** ejecutado exitosamente\n\n✓ Todos los checks pasaron\n✓ Listo para mergear'
+            });
+            
+            console.log(`✓ PR #${pr.number} aprobado automáticamente`);

@@ -103,30 +103,31 @@ jobs:
             -Dkarate.outputDir=target/karate-reports \
             -DargLine="-Dfile.encoding=UTF-8" || TEST_FAILED=true
           
-          # Generate karate.json
-          if [ -f target/karate-reports/karate-summary-json.txt ]; then
-            cp target/karate-reports/karate-summary-json.txt karate.json
-            echo "✓ Karate report copied to root"
-          else
-            cp target/karate-reports/karate.json . 2>/dev/null || echo "⚠️ No Karate report found"
-          fi
-          
           if [ "$TEST_FAILED" = "true" ]; then
             echo "⚠️ Some tests failed (continuing to report)"
           fi
       
-      # ===== 3.5. VALIDATE KARATE RESULTS =====
+      # ===== 3.5 COMBINE ALL RESULTS =====
+      - name: "Combine all Karate features"
+        run: |
+          echo "📦 Combinando resultados de todas las features..."
+          python3 combine_karate_results.py
+          
+          if [ ! -f karate.json ]; then
+            echo "❌ Failed to create karate.json"
+            exit 1
+          fi
+      
+      # ===== 3.6. VALIDATE KARATE RESULTS =====
       - name: "Validate Karate results file exists"
         id: validate_karate
         run: |
           if [ -f karate.json ]; then
-            echo "✓ Karate results file found"
-            TEST_COUNT=$(cat karate.json | grep -o '"failed"' | wc -l || echo "0")
+            SCENARIO_COUNT=$(python3 -c "import json; print(len(json.load(open('karate.json')).get('allScenarios', [])))")
+            echo "✓ karate.json encontrado con $SCENARIO_COUNT scenarios"
             echo "tests_found=true" >> $GITHUB_OUTPUT
-            echo "Found test data in karate.json"
           else
-            echo "❌ ERROR: No Karate results file (karate.json) found!"
-            echo "This means tests either didn't run or failed to generate output"
+            echo "❌ ERROR: karate.json no encontrado"
             echo "tests_found=false" >> $GITHUB_OUTPUT
             exit 1
           fi

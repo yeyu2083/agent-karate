@@ -144,7 +144,7 @@ Feature: API de Usuarios - Testing Completo
       {
         name: 'Nuevo Usuario',
         username: 'nuevouser',
-        email: 'nuevo@example.com'
+        
       }
       """
     When method POST

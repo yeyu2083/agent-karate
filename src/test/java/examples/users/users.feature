@@ -9,10 +9,10 @@ Feature: API de Usuarios - Testing Completo
   Scenario: Obtener lista de usuarios
     Given path '/users'
     When method GET
-    Then status 200
+    Then status 201
     And match response == '#array'
     And match response[0] contains { id: '#number', name: '#string', email: '#string' }
-    And match each response contains { id: '#number', name: '#string', username: '#string', email: '#string' }
+    And match each response contains { id: '#number', name: '#string', username: '#string', email: '#string', telefono: '#string' }
 
   @smoke @get
   Scenario: Obtener un usuario específico por ID

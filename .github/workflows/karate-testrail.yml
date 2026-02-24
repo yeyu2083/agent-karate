@@ -114,7 +114,22 @@ jobs:
           if [ "$TEST_FAILED" = "true" ]; then
             echo "⚠️ Some tests failed (continuing to report)"
           fi
-        continue-on-error: true
+      
+      # ===== 3.5. VALIDATE KARATE RESULTS =====
+      - name: "Validate Karate results file exists"
+        id: validate_karate
+        run: |
+          if [ -f karate.json ]; then
+            echo "✓ Karate results file found"
+            TEST_COUNT=$(cat karate.json | grep -o '"failed"' | wc -l || echo "0")
+            echo "tests_found=true" >> $GITHUB_OUTPUT
+            echo "Found test data in karate.json"
+          else
+            echo "❌ ERROR: No Karate results file (karate.json) found!"
+            echo "This means tests either didn't run or failed to generate output"
+            echo "tests_found=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
       
       # ===== 4. SETUP PYTHON ENVIRONMENT =====
       - name: "Set up Python"
@@ -130,6 +145,7 @@ jobs:
       # ===== 5. SUBMIT TO TESTRAIL & MONGODB =====
       - name: "Submit results to TestRail & MongoDB"
         id: testrail
+        if: steps.validate_karate.outputs.tests_found == 'true'
         env:
           TESTRAIL_URL: ${{ secrets.TESTRAIL_URL }}
           TESTRAIL_EMAIL: ${{ secrets.TESTRAIL_EMAIL }}
@@ -148,14 +164,20 @@ jobs:
           echo "🚀 Invoking TestRail sync agent (+ MongoDB)..."
           python -m agent.main 2>&1 | tee testrail-output.log
           
+          # Check if results were successfully submitted
+          if grep -q "Results submitted" testrail-output.log; then
+            echo "✓ Results successfully submitted to TestRail"
+          else
+            echo "⚠️ Warning: Results may not have been submitted"
+          fi
+          
           # Extract run_id if exists
           RUN_ID=$(grep -oP "Run: #\K[0-9]+" testrail-output.log | tail -1 || echo "unknown")
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
-        continue-on-error: true
       
       # ===== 6. COMMENT ON PR =====
       - name: "Comment results on PR"
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.validate_karate.outputs.tests_found == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -199,7 +221,6 @@ jobs:
               repo: context.repo.repo,
               body: comment
             });
-        continue-on-error: true
       
       # ===== 7. UPLOAD ARTIFACTS =====
       - name: "Upload test artifacts"
@@ -214,3 +235,13 @@ jobs:
             test-report.html
             src/test/java/target/karate-reports/
           retention-days: 30
+      # ===== 8. FAIL IF NO TESTS FOUND =====
+      - name: "Fail if no tests were found"
+        if: always() && steps.validate_karate.outputs.tests_found != 'true'
+        run: |
+          echo "❌ PIPELINE FAILED: No Karate test results were generated"
+          echo "This indicates that tests either:"
+          echo "  1. Did not execute properly"
+          echo "  2. Maven build failed"
+          echo "  3. No test files were found to run"
+          exit 1

@@ -62,7 +62,7 @@ jobs:
           
           # Get commit info
           COMMIT_SHA="${{ github.sha }}"
-          COMMIT_MESSAGE=$(git log -1 --pretty=%B 2>/dev/null || echo "")
+          COMMIT_MESSAGE=$(git log -1 --pretty=%s 2>/dev/null || echo "")
           BUILD_NUMBER="${{ github.run_number }}"
           
           # Extract Jira issue from branch name (e.g., SCRUM-4 from "feature/SCRUM-4-auth")
@@ -74,7 +74,10 @@ jobs:
           
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
           echo "commit_sha=${COMMIT_SHA:0:7}" >> $GITHUB_OUTPUT
-          echo "commit_message=$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+          EOF="EOF-$(date +%s)"
+          echo "commit_message<<$EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
           echo "jira_issue=$JIRA_ISSUE" >> $GITHUB_OUTPUT
           

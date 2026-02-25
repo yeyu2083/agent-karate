@@ -383,7 +383,9 @@ class DashboardUI:
                 time_since_last = "N/A"
         
         # Determinar estado: BLOQUEADO / ATENCIÓN / SALUDABLE
-        has_critical_blockers = any(b.get("overall_risk_level") == "CRITICAL" for b in blockers)
+        last_run_risk = last_run.get("overall_risk_level", "UNKNOWN") if last_run else "UNKNOWN"
+        # Solo bloqueamos si el pass rate es bajo o si el riesgo es crítico Y hay fallos reales
+        has_critical_blockers = (last_run_risk == "CRITICAL" and last_pass_rate < 100)
         last_exec_old = False
         if last_run:
             try:
@@ -635,6 +637,19 @@ class DashboardUI:
     def tab_flaky_tests(self, days=30):
         flaky = self._cached("flaky", self.queries.get_flaky_tests, ttl=120, days=days, limit=20)
         if not flaky: return pd.DataFrame({"ESTADO": ["Sin flaky tests detectados"]})
+        
+        for f in flaky:
+            fecha_str = f.get("last_run_date", "N/A")
+            if fecha_str != "N/A":
+                try:
+                    from datetime import datetime as dt_class
+                    dt_obj = dt_class.fromisoformat(fecha_str.replace("Z", "+00:00"))
+                    if dt_obj.tzinfo is None:
+                        dt_obj = dt_obj.replace(tzinfo=timezone.utc)
+                    f["last_run_date"] = dt_obj.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    f["last_run_date"] = fecha_str[:19].replace("T", " ")
+                    
         df = pd.DataFrame(flaky)
         df.columns = ["TEST ID","FLAKINESS %","FALLOS","TOTAL RUNS","ULTIMO RUN"]
         return df
@@ -650,7 +665,19 @@ class DashboardUI:
             rama = b.get("branch","unknown")
             risk = b.get("overall_risk_level","LOW")
             text = b.get("ai_blockers","—")
-            fecha = b.get("run_date","N/A")[:19].replace("T"," ")
+            
+            fecha_str = b.get("run_date","N/A")
+            fecha = fecha_str[:19].replace("T"," ")
+            if fecha_str != "N/A":
+                try:
+                    from datetime import datetime as dt_class
+                    dt_obj = dt_class.fromisoformat(fecha_str.replace("Z", "+00:00"))
+                    if dt_obj.tzinfo is None:
+                        dt_obj = dt_obj.replace(tzinfo=timezone.utc)
+                    fecha = dt_obj.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    pass
+                    
             rc = {"CRITICAL":"crit","MEDIUM":"warn","LOW":"ok"}.get(risk,"ok")
             cc = {"CRITICAL":"critical","MEDIUM":"medium","LOW":"low"}.get(risk,"low")
             cards.append(f"""

@@ -8,6 +8,7 @@ langgraph>=0.0.10
 pydantic-settings>=2.0.0
 requests>=2.25.0
 python-dotenv>=1.0.0
+pyyaml>=6.0
 jira>=3.5.0
 pyjwt>=2.8.0
 pymongo>=4.0.0

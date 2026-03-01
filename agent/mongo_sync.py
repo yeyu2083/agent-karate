@@ -13,6 +13,7 @@ import json
 try:
     from pymongo import MongoClient
     from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+    import certifi
 except ImportError:
     MongoClient = None
 
@@ -63,8 +64,12 @@ class MongoSync:
             return
 
         try:
-            # Conectar con timeout
-            self.client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+            # Conectar con timeout y certificados SSL
+            self.client = MongoClient(
+                mongo_uri, 
+                serverSelectionTimeoutMS=5000,
+                tlsCAFile=certifi.where()
+            )
             self.client.admin.command("ping")  # Test connection
             
             self.db = self.client.get_database()

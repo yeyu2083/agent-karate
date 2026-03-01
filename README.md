@@ -1,8 +1,10 @@
-# ��� Karate + TestRail + AI Pipeline
+# 🧪 Karate + TestRail + AI Pipeline
 
-> **Testing de APIs automatizado con análisis inteligente y reporte en TestRail**
+> **Testing de APIs automatizado con análisis inteligente, múltiples proyectos y orquestación automática**
 
-Proyecto completo de testing de APIs usando **Karate Framework** con integración TestRail, análisis con IA y orquestación automática en GitHub Actions.
+Proyecto completo de testing de APIs usando **Karate Framework** con integración TestRail, análisis con IA, múltiples QAs/proyectos y histórico en MongoDB.
+
+---
 
 ## ✨ Características Principales
 
@@ -12,19 +14,22 @@ Proyecto completo de testing de APIs usando **Karate Framework** con integració
 - ✅ **Data-driven testing** - Scenario Outline con múltiples datos
 - ✅ **Ejecución paralela** - Tests en paralelo para mayor velocidad
 - ✅ **Integración TestRail** - Sincroniza casos y reporta resultados
-- ✅ **Análisis con IA** - Genera insights con LLM (OpenAI, Anthropic, etc.)
+- ✅ **Análisis con IA** - Genera insights con LLM (OpenAI, Anthropic, GLM, etc.)
+- ✅ **Múltiples Proyectos/QAs** - Cada QA configura su proyecto UNA sola vez
+- ✅ **MongoDB Histórico** - Estadísticas, detección flaky tests, tendencias
+- ✅ **Slack Notifications** - Alertas automáticas con insights
 - ✅ **GitHub Actions CI/CD** - Automatización completa en cada push
 
 ---
 
-## ���️ Estructura del Proyecto
+## 📦 Estructura del Proyecto
 
 ```
 agent-karate/
 ├── src/
 │   └── test/
 │       └── java/
-│           ├── karate-config.js          # Configuración global
+│           ├── karate-config.js          # Configuración global Karate
 │           ├── TestRunner.java           # Runner principal
 │           └── examples/
 │               ├── users/
@@ -36,158 +41,56 @@ agent-karate/
 │               └── auth/
 │                   ├── AuthTest.java
 │                   └── auth.feature
-├── agent/                                # Python QA Agent
+├── agent/                                # 🤖 Python QA Agent
 │   ├── main.py                           # Orquestador principal
+│   ├── project_config.py                 # Gestor multi-proyecto
+│   ├── fetch_testrail_ids.py            # Auto-obtiene IDs TestRail
 │   ├── karate_parser.py                  # Parser JSON Karate
 │   ├── testrail_client.py                # Cliente API TestRail
-│   ├── testrail_sync.py                  # Sincronización de casos
+│   ├── testrail_sync.py                  # Sincronización casos
 │   ├── testrail_runner.py                # Ejecución y reporte
+│   ├── mongo_sync.py                     # Sincronización MongoDB
+│   ├── mongo_schema.py                   # Esquemas Pydantic
 │   ├── ai_feedback.py                    # Análisis con IA
-│   ├── state.py                          # Estado y tipos
+│   ├── slack_notifier.py                 # Notificaciones Slack
+│   ├── state.py                          # Tipos y estado
 │   └── requirements.txt                  # Dependencias Python
 ├── .github/workflows/
-│   └── karate-testrail.yml               # CI/CD Workflow
-├── testrail.config.json                  # Config QA editable
+│   ├── karate-testrail.yml               # CI/CD workflow
+│   └── testrail-projects.yaml            # 📋 Config multi-proyecto (EDITABLE)
+├── .env.example                          # Template variables
 ├── pom.xml                               # Dependencias Maven
-└── README.md
+├── fetch_ids.bat / fetch_ids.sh          # Scripts obtener IDs
+└── README.md                             # Este archivo
 ```
 
 ---
 
-## ��� Pipeline Completo: 7 Componentes
-
-### **1️⃣ Testing de APIs**
-��� `src/test/java/examples/` → Feature files + Test runners
-
-Karate ejecuta **pruebas CRUD en 3 APIs**:
-- `posts.feature` - Crear, listar, actualizar, eliminar posts
-- `users.feature` - Gestión de usuarios
-- `auth.feature` - Autenticación y autorización
-
-**Características**:
-- ���️ Tags: `@smoke`, `@regression`, `@critical` para ejecutar subsets
-- ��� Data-driven: Scenario Outline con múltiples ejemplos
-- ✔️ Validaciones: JSON schema, HTTP status, tipos de datos
-
-**¿Cómo?** Karate hace llamadas HTTP reales a JSONPlaceholder y valida respuestas.
-
----
-
-### **2️⃣ Generador de Reportes**
-��� [`agent/karate_parser.py`](agent/karate_parser.py)
-
-- ��� **Lee**: `target/karate-reports/*.karate-json.txt`
-- ��� **Extrae**: paso/fallo, logs, tiempos, escenarios
-- ��� **Estructura**: JSON → objetos Python `TestResult` tipados
-
-**¿Cómo?** Parsea resultados JSON de Karate.
-
----
-
-### **3️⃣ Sincronización TestRail**
-��� [`agent/testrail_sync.py`](agent/testrail_sync.py)
-
-- ��� **Mapea**: scenario Karate → Test Case en TestRail
-- ���️ **Categoriza**: tags `@smoke` → suites en TestRail  
-- ��� **Genera**: mapa `scenario_name → case_id`
-
-**¿Cómo?** API REST: `POST /index.php?/api/v2/add_case/...`
-
----
-
-### **4️⃣ Ejecución y Reporte**
-��� [`agent/testrail_runner.py`](agent/testrail_runner.py)
-
-| Acción | Endpoint |
-|--------|----------|
-| ��� Crear Run | `POST /add_run` |
-| ��� Enviar resultado | `POST /add_result` |
-| ��� Adjuntar artifact | JSON de Karate |
-| ���️ Metadata | BUILD_NUMBER, BRANCH, COMMIT_SHA, JIRA_ISSUE |
-
-**¿Cómo?** Cada resultado es un POST a TestRail con status + logs.
-
----
-
-### **5️⃣ Análisis con IA**
-��� [`agent/ai_feedback.py`](agent/ai_feedback.py)
-
-- ��� **LLM**: OpenAI, Anthropic, GLM, Ollama (configurable)
-- ��� **Calcula**: pass rate, risk level (��� LOW / ��� MEDIUM / ��� CRITICAL)
-- ��� **Genera**: análisis de impacto, recomendaciones, contexto QA
-- ��� **Output**: PR comment automático con insights
-
-**¿Cómo?** Envía prompt estructurado al LLM con datos de resultados.
-
----
-
-### **6️⃣ Orquestación Principal**
-��� [`agent/main.py`](agent/main.py) - **El director de orquesta**
-
-```
-Karate results 
-    ↓ parse
-JSON Karate
-    ↓ sync
-TestRail: Sync test cases
-    ↓ create + submit
-TestRail: Create run + Submit results
-    ↓ analyze
-AI Analysis (LLM)
-    ↓ report
-Generate HTML + JSON
-    ↓ save
-GitHub Actions artifacts
-```
-
-**Flujo**: Secuencial → parsea → conecta → sube → analiza → reporta.
-
----
-
-### **7️⃣ Automatización GitHub**
-��� `.github/workflows/karate-testrail.yml`
-
-| Paso | Acción |
-|------|--------|
-| ▶️ **Trigger** | push a rama o PR |
-| ��� **Build** | `mvn clean test` (ejecuta Karate) |
-| ��� **Agente** | `python main.py` (TestRail + IA) |
-| ��� **Artifacts** | HTML + JSON reportes |
-| ��� **PR Comment** | QA insights automático |
-
-**¿Cómo?** Workflow YAML encadena comandos bash + Python.
-
----
-
-## ��� Inicio Rápido
-
-Para configuración rápida, ver: **[QUICKSTART.md](QUICKSTART.md)**
+## 🚀 Inicio Rápido
 
 ### Prerequisitos
 
 - **Java JDK 17+**
 - **Maven 3.6+**
-- **Python 3.9+** (para el agente)
+- **Python 3.9+**
 
-### Instalación
+### 1️⃣ Instalación
 
 ```bash
-# 1. Instalar dependencias Java
+# Dependencias Java
 mvn clean install -DskipTests
 
-# 2. Instalar dependencias Python
+# Dependencias Python
 cd agent
 pip install -r requirements.txt
 cd ..
 
-# 3. Configurar credenciales
+# Configurar variables de entorno
 cp .env.example .env
 # Editar .env con tus credenciales
 ```
 
----
-
-## ��� Ejecutar Pruebas
+### 2️⃣ Ejecutar Tests
 
 ```bash
 # Todas las pruebas
@@ -195,99 +98,175 @@ mvn test
 
 # Solo smoke tests
 mvn test -Dtest=TestRunner#testSmoke
-
-# Solo regresión
-mvn test -Dtest=TestRunner#testRegression
-
-# Test específico
-mvn test -Dtest=TestRunner#testAuth
 ```
 
----
-
-## ��� Ejecutar Agente
+### 3️⃣ Sincronizar a TestRail
 
 ```bash
-cd agent
-python main.py
-
-# Con LLM específico
-LLM_PROVIDER=openai python main.py
+# Automáticamente: parsea → TestRail → MongoDB → Slack
+python -m agent.main
 ```
-
-**Providers soportados**: `openai`, `azure`, `anthropic`, `ollama`, `glm`
 
 ---
 
-## ��� Ideas Futuras
+## 🏗️ Pipeline Completo: 7 Componentes
 
-### **Paralelización Avanzada**
-- Ejecutar análisis de seguridad + performance + regresión **en paralelo**
-- Usar LangGraph para nodos independientes
+```
+Karate Tests
+    ↓
+Karate JSON Results
+    ↓ (parse)
+TestRail Sync: Crear/mapear casos
+    ↓
+TestRail: Crear run + Enviar resultados
+    ↓
+AI Feedback: Analizar con LLM
+    ↓
+MongoDB: Guardar histórico + Estadísticas
+    ↓
+Slack: Notificar QA
+```
 
-### **Notificaciones Inteligentes**
-- Fallo crítico → ��� Slack/Teams automático
-- Rendimiento lento → ��� alert de performance
-- Test flaky → ⚠️ indicador de inestabilidad
+### **1️⃣ Testing de APIs**
+📁 `src/test/java/examples/` 
 
-### **Dashboards Históricos**
-- Histórico de runs en TestRail/Grafana
-- Tendencias de calidad por semana/mes
-- Análisis de cobertura
+**3 APIs testeadas:**
+- `posts.feature` - CRUD de posts
+- `users.feature` - Gestión de usuarios
+- `auth.feature` - Autenticación y autorización
 
-### **Reintento Automático**
-- Si falla → reintentar 2x automático
-- Solo marcar fallo definitivo si todos fallan
-- Detección de tests flaky
+**Características:**
+- 🏷️ Tags: `@smoke`, `@regression`, `@critical`
+- 📊 Data-driven: Scenario Outline
+- ✔️ Validaciones: JSON schema, HTTP status
 
-### **Feedback Loop Inteligente**
-- IA sugiere fix con código → auto-push a rama
-- Re-ejecutar automático post-fix
-- Ciclo: bug → analyze → suggest fix → test → report
+### **2️⃣ Generador de Reportes**
+📄 [`agent/karate_parser.py`]
 
-### **Integración JIRA Completa**
-- Fallo → crear issue automático en Jira
-- Link bidireccional: Jira ↔ TestRail ↔ Karate
-- Auto-linkar PRs con issues
+- Lee: `target/karate-reports/*.karate-json.txt`
+- Extrae: paso/fallo, logs, tiempos
+- Estructura: JSON → objetos Python tipados
+
+### **3️⃣ Sincronización TestRail**
+📝 [`agent/testrail_sync.py`]
+
+- Mapea: scenario Karate → Test Case
+- Categoriza: tags → suites
+- Genera: mapa scenario → case_id
+
+### **4️⃣ Ejecución y Reporte**
+🎯 [`agent/testrail_runner.py`]
+
+- Crear Run
+- Enviar resultados
+- Adjuntar artifacts
+- Metadata (BUILD, BRANCH, COMMIT)
+
+### **5️⃣ Análisis con IA**
+🤖 [`agent/ai_feedback.py`]
+
+- **LLM:** OpenAI, Anthropic, GLM, Ollama
+- **Calcula:** pass rate, risk level
+- **Genera:** análisis, recomendaciones
+- **Output:** PR comment automático
+
+### **6️⃣ Orquestación Principal**
+🎭 [`agent/main.py`]
+
+Secuencial:
+1. Parse Karate results
+2. Sync a TestRail
+3. Create run + Submit results
+4. Generate AI feedback
+5. Save MongoDB
+6. Notify Slack
+
+### **7️⃣ Automatización GitHub**
+⚙️ `.github/workflows/karate-testrail.yml`
+
+- Trigger: push/PR
+- Build: `mvn clean test`
+- Agent: `python main.py`
+- Artifacts: HTML + JSON
+- PR Comment: insights auto
 
 ---
 
-## ��� Ejemplo de Salida
+# 📚 TABLA DE CONTENIDOS
+
+1. **[SECCIÓN 1: Agente Python](#sección-1-agente-python---arquitectura)**
+2. **[SECCIÓN 2: Configuración QA](#sección-2-configuración-para-qa---multi-proyecto)**
+3. **[SECCIÓN 3: MongoDB](#sección-3-mongodb---histórico--analytics)**
+4. **[SECCIÓN 4: LLM Providers](#sección-4-llm-providers---ia-feedback)**
+5. **[SECCIÓN 5: Configuración Completa](#sección-5-configuración-completa)**
+6. **[SECCIÓN 6: Troubleshooting](#sección-6-troubleshooting)**
+7. **[SECCIÓN 7: Ideas Futuras](#sección-7-ideas-futuras)**
+
+---
+
+# 🛠️ SECCIÓN 1: Agente Python - Arquitectura
+
+## Overview
+
+El **Agente Python** es el orquestador central que:
+- Lee resultados de Karate
+- Sincroniza a TestRail
+- Genera análisis con IA
+- Guarda histórico en MongoDB
+- Notifica en Slack
+
+## Estructura del Agente
+
+```
+agent/
+├── main.py                  # Entry point
+├── project_config.py        # Config multi-proyecto
+├── fetch_testrail_ids.py   # Auto-obtiene IDs
+├── karate_parser.py        # Parse JSON Karate
+├── testrail_client.py      # Cliente TestRail
+├── testrail_sync.py        # Sync casos
+├── testrail_runner.py      # Runs + resultados
+├── mongo_sync.py           # MongoDB
+├── mongo_schema.py         # Schemas
+├── ai_feedback.py          # LLM feedback
+├── slack_notifier.py       # Slack
+├── state.py                # Tipos
+└── requirements.txt        # Deps
+```
+
+## Ejemplo de Salida
 
 ```
 ============================================================
-��� TestRail Integration Agent with AI Feedback
+🧪 TestRail Integration Agent with AI Feedback
 ============================================================
 
-��� Parsing Karate results...
+👤 QA Ejecutando: Yesica Windecker
+   Email: yeyuwin9@gmail.com
+
+📋 Parsing Karate results...
 ✓ Loaded 45 test results
 
-��� Results: 43 passed, 2 failed
+📊 Results: 43 passed, 2 failed
 
-��� Connecting to TestRail...
-✓ Connected to TestRail
-
-��� Syncing test cases...
+📝 Syncing test cases...
 ✓ Synced 45 test cases
 
-��� Creating test run...
-✓ Created run #42
-
-��� Submitting results...
+📊 Submitting results...
 ✓ Results submitted
 
-��� AI FEEDBACK & INSIGHTS
-============================================================
+🤖 AI FEEDBACK & INSIGHTS
+🔴 Risk Level: MEDIUM (95% pass rate)
 
-��� Risk Level: MEDIUM (95% pass rate)
+💾 MONGODB SYNC
+✓ Guardados 45 test results
 
-��� FAILURE ROOT CAUSE ANALYSIS
-Test: user_delete_invalid_id
-Expected: 404 Not Found
-Actual: 500 Internal Server Error
-Root Cause: Missing input validation
+📈 Branch Stats:
+   Pass Rate: 95.6%
+   Avg Duration: 245ms
 
-Recommendation: Add validation to convert invalid IDs to 404
+📢 SLACK NOTIFICATION
+✓ Notification sent
 
 ============================================================
 ✅ Run #42
@@ -296,44 +275,486 @@ Recommendation: Add validation to convert invalid IDs to 404
 
 ---
 
-## ���️ Configuración Avanzada
+# 📖 SECCIÓN 2: Configuración para QA - Multi-Proyecto
 
-Ver [`LLM_PROVIDERS.md`](agent/LLM_PROVIDERS.md) para detalles de cada LLM.
+## 🎯 Cambio Principal
 
-### Mejor Práctica por Escenario:
+**Antes:** Un archivo JSON - un solo proyecto
 
-| Escenario | Provider | Razón |
-|-----------|----------|-------|
-| ��� Desarrollo | `glm` o `ollama` | Rápido, gratuito/local |
-| ��� CI/CD | `openai` o `anthropic` | Mejor calidad |
-| ��� Producción | `azure` o `ollama` | Control empresarial / privado |
+**Ahora:** Un archivo YAML (`.github/workflows/testrail-projects.yaml`) - múltiples proyectos y QAs
+
+## Flujo QA: Primer Día (Setup Único)
+
+### Paso 1: Credenciales en `.env`
+
+```bash
+TESTRAIL_URL=https://xxxxx.testrail.io
+TESTRAIL_EMAIL=yeyuwin9@gmail.com
+TESTRAIL_API_KEY=xxxxx_xxxxxxx
+```
+
+### Paso 2: Agregar proyecto a `config/testrail-projects.yaml`
+
+```yaml
+projects:
+  agent-testing-comments:
+    project_name: "agent-testing"      # Nombre EXACTO
+    section_name: "comments"           # Nombre EXACTO de la sección
+    qa_email: "yeyuwin9@gmail.com"
+    qa_name: "Yesica Windecker"
+    project_id: null                   # Se llena automático
+    section_id: null                   # Se llena automático
+```
+
+### Paso 3: Obtener IDs (UNA SOLA VEZ)
+
+```bash
+# Windows
+fetch_ids.bat
+
+# Mac/Linux
+bash fetch_ids.sh
+
+# O directamente
+python -m agent.fetch_testrail_ids
+```
+
+**Output esperado:**
+```
+✅ Conexión a TestRail exitosa
+📌 Project ID: 2
+📌 Suite ID: 6
+✅ testrail-projects.yaml actualizado
+```
+
+## Flujo QA: Días Posteriores
+
+### Si hay UN SOLO proyecto:
+
+```bash
+mvn test
+python -m agent.main
+```
+
+### Si hay MÚLTIPLES proyectos:
+
+```bash
+python -m agent.main --project agent-testing-comments
+```
+
+## Múltiples QAs
+
+**Yesica** + **María** en proyectos diferentes:
+
+```yaml
+projects:
+  agent-testing-comments:
+    project_name: "agent-testing"
+    section_name: "comments"
+    qa_email: "yeyuwin9@gmail.com"
+    qa_name: "Yesica Windecker"
+    project_id: 2
+    section_id: 6
+
+  auth-api-auth:
+    project_name: "auth-api"
+    section_name: "authentication"
+    qa_email: "maria@company.com"
+    qa_name: "María García"
+    project_id: 3
+    section_id: 7
+```
+
+**Ejecución:**
+- Yesica: `python -m agent.main --project agent-testing-comments`
+- María: `python -m agent.main --project auth-api-auth`
+
+## ¿Qué se captura automáticamente?
+
+✅ **Del YAML:**
+- Project ID, Suite ID
+- QA name, QA email
+
+✅ **A TestRail:**
+- Casos de prueba desde Karate
+- Resultados asignados a QA email
+- Logs y metadata
+
+✅ **A MongoDB:**
+- Quién ejecutó (QA name)
+- Qué proyecto
+- Histórico de resultados
+
+✅ **A Slack:**
+- Mención al QA
+- Resultados de su proyecto
+- Feedback IA
+
+## Troubleshooting Multi-Proyecto
+
+**"Múltiples proyectos. Especifica cuál"**
+```bash
+python -m agent.main --project agent-testing-comments
+```
+
+**"No hay proyectos configurados"**
+```bash
+python -m agent.fetch_testrail_ids
+```
+
+Más detalles en la **SECCIÓN 2** de este README.
 
 ---
 
-## ��� Contacto & Contribución
+# 💾 SECCIÓN 3: MongoDB - Histórico & Analytics
 
-Para preguntas o sugerencias sobre este proyecto.
+## Setup
+
+### Opción 1: Local (Development)
+
+```bash
+# macOS
+brew tap mongodb/brew
+brew install mongodb-community
+brew services start mongodb-community
+```
+
+### Opción 2: MongoDB Atlas (Cloud - Recomendado CI/CD)
+
+1. **Crear cluster:** https://www.mongodb.com/cloud/atlas
+2. **Obtener connection string:**
+   ```
+   mongodb+srv://username:password@cluster.mongodb.net/agent-karate
+   ```
+3. **En `.env`:**
+   ```bash
+   MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/agent-karate
+   ```
+
+## Colecciones de Datos
+
+### 1. `test_results` - Cada test
+
+```javascript
+{
+  test_id: "API de Posts.Obtener posts",
+  execution_id: "uuid-batch-001",
+  branch: "feature/posts",
+  pr_number: 60,
+  status: "passed",
+  duration_ms: 245.5,
+  github_actor: "Yesica Windecker",    // QA que ejecutó
+  testrail_case_id: 362
+}
+```
+
+### 2. `execution_summaries` - Resumen batch
+
+```javascript
+{
+  execution_batch_id: "batch-2026-01-30-60",
+  branch: "feature/posts",
+  total_tests: 12,
+  passed_tests: 11,
+  overall_pass_rate: 91.67,
+  github_actor: "Yesica Windecker",
+  testrail_run_id: 42
+}
+```
+
+### 3. `test_trends` - Análisis histórico
+
+- Pass rate tendencies
+- Flakiness scores
+- Errores comunes
+- Frecuencia de tags
+
+### 4. `ai_feedback` - Insights reutilizables
+
+- Root causes
+- Sistemas afectados
+- Impacto en usuario
+- Acciones recomendadas
+
+## Uso en Código
+
+### Automático (Integrado)
+
+```bash
+python -m agent.main
+```
+
+Output incluye:
+```
+💾 MONGODB SYNC
+✓ Guardados 45 test results
+📈 Branch Stats: 91.7% pass rate
+🔴 Flaky Tests: API.Auth.Timeout: 40%
+```
+
+### Queries Manuales
+
+```python
+from agent.mongo_sync import MongoSync
+
+mongo = MongoSync()
+
+# Historial de un test
+history = mongo.get_test_history("API Posts", "Obtener", limit=10)
+
+# Tests flaky
+flaky = mongo.get_flaky_tests(min_flakiness=0.3)
+
+# Stats por rama
+stats = mongo.get_branch_stats("feature/posts", days=7)
+```
+
+## Índices Recomendados
+
+```bash
+mongosh
+use agent-karate
+
+db.test_results.createIndex({ execution_id: 1 })
+db.test_results.createIndex({ branch: 1, run_date: -1 })
+db.execution_summaries.createIndex({ pr_number: 1 })
+db.test_trends.createIndex({ flakiness_score: 1 })
+```
+
+## Integración CI/CD
+
+```yaml
+# En .github/workflows/karate-testrail.yml
+- name: Set MongoDB URI
+  run: echo "MONGO_URI=${{ secrets.MONGO_URI }}" >> $GITHUB_ENV
+
+- name: Run Agent (MongoDB sync automático)
+  run: python -m agent.main
+```
+
+## Deshabilitar MongoDB
+
+```bash
+# No establecer MONGO_URI
+# O en .env
+MONGO_ENABLED=false
+```
 
 ---
-🔧 Setup de Slack (3 min):
-Ve a tu Slack workspace
 
-https://api.slack.com/apps
-Click "Create New App"
-"From scratch"
-Name: "Karate TestRail"
-Pick your workspace
-Activa Incoming Webhooks
+# 🤖 SECCIÓN 4: LLM Providers - IA Feedback
 
-Click "Incoming Webhooks"
-Toggle: "On"
-Click "Add New Webhook to Workspace"
-Selecciona canal: #qa-automation (o la que quieras)
-"Allow"
-Copia el Webhook URL
+## Providers Soportados
 
-Verás algo como: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXX...
-Pégalo en tu .env:
+| Provider | Setup | Costo | Recomendación |
+|----------|-------|-------|---------------|
+| **OpenAI** | API Key | Pagado | Mejor calidad |
+| **Anthropic** | API Key | Pagado | Alternativa |
+| **GLM** | API Key | Gratis | Desarrollo |
+| **Ollama** | Local | Gratis | Privado |
 
-**¡Happy Testing! ���**
+## Configuración
+
+### OpenAI
+
+```bash
+TESTRAIL_URL=https://xxxxx.testrail.io
+TESTRAIL_EMAIL=xxx@gmail.com
+TESTRAIL_API_KEY=xxx
+OPENAI_API_KEY=sk-proj-xxxxxxx
+LLM_PROVIDER=openai
+```
+
+### Ollama (Local)
+
+```bash
+# Instalar desde https://ollama.ai
+ollama pull llama2
+ollama serve
+
+# En .env
+LLM_PROVIDER=ollama
+```
+
+### GLM (Gratis)
+
+```bash
+GOOGLE_API_KEY=your-key
+LLM_PROVIDER=glm
+```
+
+## Uso
+
+```bash
+# Automático (usa provider en .env)
+python -m agent.main
+
+# O especificar
+LLM_PROVIDER=openai python -m agent.main
+```
+
+---
+
+# ⚙️ SECCIÓN 5: Configuración Completa
+
+## Variables de Entorno (`.env`)
+
+```bash
+# ===== TESTRAIL =====
+TESTRAIL_URL=https://xxxxx.testrail.io
+TESTRAIL_EMAIL=yeyuwin9@gmail.com
+TESTRAIL_API_KEY=xxxxx_xxxxxxx
+
+# ===== MONGODB =====
+MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/agent-karate
+MONGO_ENABLED=true
+
+# ===== SLACK =====
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T00000/B00000/XXXXX
+SLACK_ENABLED=true
+
+# ===== LLM =====
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-proj-xxxxxxx
+
+# ===== CI/CD =====
+BUILD_NUMBER=123
+BRANCH_NAME=feature/posts
+COMMIT_SHA=abc123def456
+GITHUB_ACTOR=yesica-windecker
+```
+
+## Setup Slack (3 minutos)
+
+1. Ve a https://api.slack.com/apps
+2. "Create New App" → "From scratch"
+3. Name: "Karate TestRail"
+4. Selecciona workspace
+5. "Incoming Webhooks" → Toggle "On"
+6. "Add New Webhook to Workspace"
+7. Selecciona canal: `#qa-automation`
+8. Copia el Webhook URL
+9. En `.env`:
+   ```bash
+   SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T00000000/B00000000/XXXXX
+   ```
+
+## GitHub Secrets (CI/CD)
+
+```bash
+# En repository → Settings → Secrets
+TESTRAIL_URL
+TESTRAIL_EMAIL
+TESTRAIL_API_KEY
+MONGO_URI
+SLACK_WEBHOOK_URL
+OPENAI_API_KEY
+```
+
+Uso en workflow:
+```yaml
+- name: Run Agent
+  env:
+    TESTRAIL_URL: ${{ secrets.TESTRAIL_URL }}
+    MONGO_URI: ${{ secrets.MONGO_URI }}
+  run: python -m agent.main
+```
+
+---
+
+# 🔍 SECCIÓN 6: Troubleshooting
+
+### Error: Karate results file not found
+
+```bash
+mvn clean test
+ls target/karate-reports/
+```
+
+### Error: TestRail connection failed
+
+```bash
+python -c "from agent.testrail_client import TestRailClient, TestRailSettings; \
+           settings = TestRailSettings(); \
+           client = TestRailClient(settings); \
+           client.check_connection()"
+```
+
+### Error: No se encontró testrail-projects.yaml
+
+```bash
+ls -la .github/workflows/testrail-projects.yaml
+mkdir -p .github/workflows
+```
+
+### Error: pymongo not installed
+
+```bash
+pip install -r agent/requirements.txt
+```
+
+### Error: "Múltiples proyectos"
+
+```bash
+python -m agent.main --project agent-testing-comments
+```
+
+### Verificar MongoDB
+
+```bash
+mongosh
+show databases
+use agent-karate
+db.test_results.find()
+```
+
+### Verificar Slack
+
+```bash
+curl -X POST -H 'Content-type: application/json' \
+  --data '{"text":"Test"}' \
+  YOUR_WEBHOOK_URL
+```
+
+---
+
+# 🚀 SECCIÓN 7: Ideas Futuras
+
+### Paralelización Avanzada
+- Análisis de seguridad + performance + regresión en paralelo
+- LangGraph nodos independientes
+
+### Notificaciones Inteligentes
+- Fallo crítico → 🚨 Slack automático
+- Rendimiento lento → 🐢 alert
+- Test flaky → ⚠️ indicador
+
+### Dashboards Históricos
+- Grafana + histórico
+- Tendencias de calidad
+- Análisis de cobertura
+
+### Reintento Automático
+- Si falla → reintentar 2x
+- Detección flaky mejorada
+
+### Feedback Loop Inteligente
+- IA sugiere fix con código
+- Auto-push a rama
+- Re-ejecución automática
+
+### Integración JIRA Completa
+- Fallo → issue automático en Jira
+- Link bidireccional: Jira ↔ TestRail ↔ Karate
+- Auto-linkar PRs con issues
+
+---
+
+# 📞 Contacto & Contribución
+
+Para preguntas o sugerencias, abre un issue o contacta al equipo QA.
+
+---
+
+**¡Happy Testing! 🧪**
 

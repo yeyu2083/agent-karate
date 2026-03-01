@@ -19,31 +19,34 @@ from .mongo_sync import MongoSync
 from .slack_notifier import SlackNotifier
 from .ai_feedback import generate_pipeline_feedback
 from .html_reporter import generate_html_report
+from .project_config import ProjectConfigManager, ProjectConfig
 
 # Load .env from project root (works whether called as: python -m agent.main or python agent/main.py)
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
 load_dotenv(dotenv_path=env_path, verbose=False)
 load_dotenv()
 
-# Load testrail.config.json and set env vars for TestRailSettings
-def _load_config():
-    """Load testrail.config.json and set environment variables"""
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    config_path = os.path.join(project_root, 'testrail.config.json')
+# Load project configuration from YAML
+def _load_project_config(project_key: str = None) -> ProjectConfig:
+    """
+    Carga la configuración del proyecto desde testrail-projects.yaml
     
-    if os.path.exists(config_path):
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-            
-            # Set env vars from config if not already set
-            if 'testrail' in config:
-                tr_config = config['testrail']
-                if tr_config.get('project_id'):
-                    os.environ.setdefault('TESTRAIL_PROJECT_ID', str(tr_config['project_id']))
-                if tr_config.get('suite_id'):
-                    os.environ.setdefault('TESTRAIL_SUITE_ID', str(tr_config['suite_id']))
-
-_load_config()
+    Args:
+        project_key: Clave del proyecto. Si hay un solo proyecto, se usa automáticamente
+    
+    Returns:
+        ProjectConfig con los datos del proyecto
+    """
+    manager = ProjectConfigManager()
+    project_config = manager.get_project(project_key)
+    
+    # Establecer variables de entorno para TestRailSettings
+    os.environ['TESTRAIL_PROJECT_ID'] = str(project_config.project_id)
+    os.environ['TESTRAIL_SUITE_ID'] = str(project_config.section_id)
+    
+    print(f"✓ Config cargada: {project_config}")
+    
+    return project_config
 
 def _get_git_commit() -> str:
     """Get current git commit SHA or fallback to local"""
@@ -114,11 +117,30 @@ def find_karate_results() -> str:
     print(f"❌ No Karate results file found")
     return None
 
-def main():
-    """Main agent flow"""
+def main(project_key: str = None):
+    """
+    Main agent flow
+    
+    Args:
+        project_key: Clave del proyecto a usar. Si hay un solo proyecto, se usa automáticamente
+    """
     print("\n" + "="*60)
     print("🧪 TestRail Integration Agent with AI Feedback")
     print("="*60)
+    
+    # Cargar configuración del proyecto
+    print("\n📋 Loading project configuration...")
+    try:
+        project_config = _load_project_config(project_key)
+    except Exception as e:
+        print(f"❌ Configuration error: {e}")
+        return
+    
+    # Mostrar info del QA que ejecuta
+    print(f"\n👤 QA Ejecutando: {project_config.qa_name}")
+    print(f"   Email: {project_config.qa_email}")
+    print(f"   Proyecto: {project_config.project_name}")
+    print(f"   Sección: {project_config.section_name}")
     
     # Find Karate results
     karate_json_path = find_karate_results()
@@ -331,7 +353,14 @@ def main():
                     pr_number = int(os.getenv("GITHUB_REF", "").split("/")[2])
                 except:
                     pass
-            github_actor = os.getenv("GITHUB_ACTOR") or os.getenv("USER") or os.getenv("USERNAME", "dev")
+            
+            # Usar info del QA desde la configuración del proyecto
+            # Si no está disponible, usar github_actor como fallback
+            qa_executor = project_config.qa_name
+            qa_email = project_config.qa_email
+            github_actor = project_config.qa_name
+            
+            print(f"📊 Ejecutor de Tests (desde config): {qa_executor} <{qa_email}>")
             
             # Guardar cada test result
             print(f"\n📝 Saving {len(results)} test results...")
@@ -342,7 +371,7 @@ def main():
                     commit_sha=commit_sha,
                     branch=branch,
                     pr_number=pr_number,
-                    github_actor=github_actor,
+                    github_actor=qa_executor,
                     testrail_case_id=case_id_map.get(f"{result.feature}.{result.scenario}"),
                 )
             
@@ -354,7 +383,7 @@ def main():
                 commit_sha=commit_sha,
                 results=results,
                 pr_number=pr_number,
-                github_actor=github_actor,
+                github_actor=qa_executor,
                 testrail_run_id=run_id,
                 ai_summary={
                     "pr_comment": ai_feedback,
@@ -401,8 +430,9 @@ def main():
                     pr_number = int(os.getenv("GITHUB_REF", "").split("/")[2])
                 except:
                     pass
-            github_actor = os.getenv("GITHUB_ACTOR") or os.getenv("USER") or os.getenv("USERNAME", "dev")
-            commit_sha = os.getenv("COMMIT_SHA", os.getenv("GITHUB_SHA", _get_git_commit()))
+            
+            # Usar info del QA desde la configuración del proyecto
+            qa_executor = project_config.qa_name
             
             # Calcular métricas
             passed = sum(1 for r in results if r.status == "passed")
@@ -434,7 +464,7 @@ def main():
                 risk_level=risk_level,
                 branch=branch,
                 testrail_run_id=run_id,
-                github_actor=github_actor,
+                github_actor=qa_executor,
                 commit_sha=commit_sha,
                 pr_number=pr_number,
                 ai_comment=clean_feedback[:500] if clean_feedback else None,
@@ -453,4 +483,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Parsear argumentos de línea de comandos
+    project_key = None
+    if len(sys.argv) > 1:
+        if sys.argv[1] in ['--project', '-p']:
+            project_key = sys.argv[2] if len(sys.argv) > 2 else None
+        else:
+            # Si el primer argumento no es una flag, asumirlo como project_key
+            project_key = sys.argv[1]
+    
+    main(project_key=project_key)

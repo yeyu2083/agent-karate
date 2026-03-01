@@ -48,6 +48,58 @@ try:
     print(f"\n✅ Client created")
     print(f"  Base URL: {client.base_url}")
     print(f"  Auth: ({settings.testrail_email}, ***)")
+    
+    # Get all projects to find agent-testing
+    print("\n🔍 Buscando proyectos...")
+    import requests
+    response = requests.get(
+        f"{client.base_url}/get_projects",
+        auth=client.auth,
+        headers=client.headers
+    )
+    
+    if response.status_code == 200:
+        projects = response.json()
+        print(f"✅ Se encontraron {len(projects)} proyecto(s):\n")
+        
+        target_project = None
+        for proj in projects:
+            print(f"  📌 {proj['name']:<30} (ID: {proj['id']})")
+            if proj['name'].lower() == "agent-testing":
+                target_project = proj
+        
+        if target_project:
+            print(f"\n✅ ¡Encontré 'agent-testing'! ID: {target_project['id']}")
+            
+            # Get suites for this project
+            print(f"\n🔍 Buscando suites en 'agent-testing'...")
+            suite_response = requests.get(
+                f"{client.base_url}/get_suites/{target_project['id']}",
+                auth=client.auth,
+                headers=client.headers
+            )
+            
+            if suite_response.status_code == 200:
+                suites = suite_response.json()
+                print(f"✅ Se encontraron {len(suites)} suite(s):\n")
+                
+                for suite in suites:
+                    print(f"  📦 {suite['name']:<30} (ID: {suite['id']})")
+                    if suite['name'].lower() == "comments":
+                        print(f"\n✅ ¡Encontré 'comments'! ID: {suite['id']}")
+                        print(f"\n{'='*60}")
+                        print(f"📋 VALORES PARA TU CONFIGURACIÓN:")
+                        print(f"{'='*60}")
+                        print(f"  TESTRAIL_PROJECT_ID={target_project['id']}")
+                        print(f"  TESTRAIL_SUITE_ID={suite['id']}")
+                        print(f"\nAgrégalos a: agent/.env")
+                        print(f"{'='*60}")
+            else:
+                print(f"❌ Error obteniendo suites: {suite_response.text}")
+        else:
+            print(f"\n❌ No encontré 'agent-testing'. Revisa el nombre exacto.")
+    else:
+        print(f"❌ Error obteniendo proyectos: {response.text}")
 except Exception as e:
     print(f"\n❌ Client creation failed: {e}")
     sys.exit(1)

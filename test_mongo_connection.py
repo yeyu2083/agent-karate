@@ -37,9 +37,10 @@ def test_mongo_connection():
     
     try:
         from pymongo import MongoClient
+        import certifi
         print("✓ Attempting connection...")
         
-        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000)
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000, tls=True, tlsAllowInvalidCertificates=True)
         client.admin.command("ping")
         
         db = client.get_database()
